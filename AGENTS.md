@@ -66,3 +66,11 @@ Release-Note-KO: 사용자가 이해할 수 있는 한글 변경 설명
 
 - For an already-pushed historical commit that cannot be amended, add its full commit SHA and Korean explanation to `.github/release-note-overrides.json`.
 - Tag release automation must fail when a commit has neither a Korean summary nor a `Release-Note-KO:` override.
+
+## README and Release Note Emoji Style
+
+- Use one relevant emoji at the start of major README and release-note headings to improve scanning.
+- Use consistent semantic emoji, such as `🚀` for releases, `✨` for features, `🐛` for fixes, `⚙️` for settings, `⌨️` for shortcuts, `🔐` for security or connections, and `🛠️` for build work.
+- Keep heading text meaningful without relying on the emoji so that accessibility and plain-text rendering remain clear.
+- Do not add decorative emoji to every bullet, sentence, command, commit subject, or file path.
+- Prefer a single precise emoji over multiple adjacent emoji.
