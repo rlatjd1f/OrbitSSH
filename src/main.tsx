@@ -28,6 +28,7 @@ import {
 import "@xterm/xterm/css/xterm.css";
 import "./styles.css";
 import "./features.css";
+import { translate, type AppLanguage, type MessageKey } from "./i18n";
 
 type SessionState = "connecting" | "connected" | "closed" | "error";
 type Session = {
@@ -39,6 +40,7 @@ type Session = {
 };
 const emptyStore: ConnectionStore = { groups: [], hosts: [] };
 const defaultSettings: AppSettings = {
+  language: "ko",
   terminalFontSize: 12,
   terminalFontFamily: "JetBrains Mono, Menlo, monospace",
   terminalLineHeight: 1.45,
@@ -61,18 +63,20 @@ const terminalFonts = [
   ["Source Code Pro", "Source Code Pro, monospace"],
   ["IBM Plex Mono", "IBM Plex Mono, monospace"],
   ["Cascadia Code", "Cascadia Code, monospace"],
-  ["시스템 고정폭", "ui-monospace, SFMono-Regular, monospace"],
+  ["system", "ui-monospace, SFMono-Regular, monospace"],
 ] as const;
 
 function TerminalPane({
   session,
   settings,
+  language,
   active,
   onState,
   onReconnect,
 }: {
   session: Session;
   settings: AppSettings;
+  language: AppLanguage;
   active: boolean;
   onState: (state: SessionState) => void;
   onReconnect: () => void;
@@ -82,9 +86,11 @@ function TerminalPane({
   const sessionRef = useRef(session);
   const onStateRef = useRef(onState);
   const onReconnectRef = useRef(onReconnect);
+  const languageRef = useRef(language);
   sessionRef.current = session;
   onStateRef.current = onState;
   onReconnectRef.current = onReconnect;
+  languageRef.current = language;
   useEffect(() => {
     if (!ref.current || !window.desktop) return;
     const term = new Terminal({
@@ -172,7 +178,7 @@ function TerminalPane({
         (current.state === "closed" || current.state === "error") &&
         (data === "\r" || data === "\n")
       ) {
-        term.writeln("\r\n\x1b[90m[재접속 중...]\x1b[0m");
+        term.writeln(`\r\n\x1b[90m[${translate(languageRef.current, "reconnecting")}]\x1b[0m`);
         onReconnectRef.current();
         return;
       }
@@ -185,13 +191,13 @@ function TerminalPane({
     const exitOff = window.desktop.terminal.onExit((v) => {
       if (v.sessionId === sessionRef.current.sessionId) {
         term.writeln(
-          `\r\n\x1b[90m[연결 종료 · exit ${v.exitCode}]\r\n[Enter를 누르면 다시 연결합니다]\x1b[0m`,
+          `\r\n\x1b[90m[${translate(languageRef.current, "connectionEnded", { code: v.exitCode })}]\r\n[${translate(languageRef.current, "pressEnterReconnect")}]\x1b[0m`,
         );
         onStateRef.current(v.exitCode === 0 ? "closed" : "error");
       }
     });
     if (!sessionRef.current.sessionId)
-      term.writeln("\x1b[90m연결을 시작하는 중...\x1b[0m");
+      term.writeln(`\x1b[90m${translate(languageRef.current, "connecting")}\x1b[0m`);
     else {
       onResize();
       term.focus();
@@ -265,19 +271,42 @@ function SettingsForm({
   onDownloadUpdate: () => void;
   onOpenRelease: () => void;
 }) {
+  const language = value.language;
+  const t = (key: MessageKey, values?: Record<string, string | number>) =>
+    translate(language, key, values);
   const update = <K extends keyof AppSettings>(key: K, next: AppSettings[K]) =>
     onChange({ ...value, [key]: next });
   return (
     <form onSubmit={onSubmit}>
-      <h2>설정</h2>
-      <p>Orbit SSH 전체에 적용되는 기본 동작을 관리합니다.</p>
+      <h2>{t("settings")}</h2>
+      <p>{t("settingsDescription")}</p>
       <section className="settings-section">
-        <h3>터미널</h3>
+        <h3>{t("general")}</h3>
         <div className="settings-grid">
           <label className="settings-wide">
-            터미널 폰트
+            {t("language")}
             <select
-              aria-label="터미널 폰트"
+              data-testid="language-select"
+              aria-label={t("language")}
+              value={value.language}
+              onChange={(event) =>
+                update("language", event.target.value as AppLanguage)
+              }
+            >
+              <option value="ko">{t("korean")}</option>
+              <option value="en">{t("english")}</option>
+            </select>
+          </label>
+        </div>
+      </section>
+      <section className="settings-section">
+        <h3>{t("terminal")}</h3>
+        <div className="settings-grid">
+          <label className="settings-wide">
+            {t("terminalFont")}
+            <select
+              data-testid="terminal-font"
+              aria-label={t("terminalFont")}
               value={value.terminalFontFamily}
               onChange={(event) =>
                 update("terminalFontFamily", event.target.value)
@@ -285,79 +314,79 @@ function SettingsForm({
               style={{ fontFamily: value.terminalFontFamily }}
             >
               {!terminalFonts.some(([, font]) => font === value.terminalFontFamily) && (
-                <option value={value.terminalFontFamily}>현재 설정</option>
+                <option value={value.terminalFontFamily}>{t("currentSetting")}</option>
               )}
               {terminalFonts.map(([label, font]) => (
-                <option key={label} value={font}>{label}</option>
+                <option key={label} value={font}>{label === "system" ? t("systemMonospace") : label}</option>
               ))}
             </select>
           </label>
           <label>
-            글꼴 크기
-            <input aria-label="터미널 글꼴 크기" type="number" min="9" max="24" value={value.terminalFontSize} onChange={(e) => update("terminalFontSize", Number(e.target.value))} />
+            {t("fontSize")}
+            <input data-testid="terminal-font-size" aria-label={t("fontSize")} type="number" min="9" max="24" value={value.terminalFontSize} onChange={(e) => update("terminalFontSize", Number(e.target.value))} />
           </label>
           <label>
-            줄 간격
-            <select aria-label="터미널 줄 간격" value={value.terminalLineHeight} onChange={(e) => update("terminalLineHeight", Number(e.target.value))}>
-              <option value="1.2">좁게</option><option value="1.45">기본</option><option value="1.7">넓게</option>
+            {t("lineHeight")}
+            <select data-testid="terminal-line-height" aria-label={t("lineHeight")} value={value.terminalLineHeight} onChange={(e) => update("terminalLineHeight", Number(e.target.value))}>
+              <option value="1.2">{t("compact")}</option><option value="1.45">{t("normal")}</option><option value="1.7">{t("spacious")}</option>
             </select>
           </label>
           <label>
-            탭당 스크롤 버퍼 (줄)
-            <input aria-label="터미널 스크롤 버퍼" type="number" min="1000" max="50000" step="1000" value={value.scrollback} onChange={(e) => update("scrollback", Number(e.target.value))} />
+            {t("scrollback")}
+            <input data-testid="terminal-scrollback" aria-label={t("scrollback")} type="number" min="1000" max="50000" step="1000" value={value.scrollback} onChange={(e) => update("scrollback", Number(e.target.value))} />
           </label>
           <label className="setting-toggle">
-            <span><b>커서 깜빡임</b><small>활성 터미널 커서를 깜빡입니다.</small></span>
-            <input aria-label="커서 깜빡임" type="checkbox" checked={value.cursorBlink} onChange={(e) => update("cursorBlink", e.target.checked)} />
+            <span><b>{t("cursorBlink")}</b><small>{t("cursorBlinkDescription")}</small></span>
+            <input aria-label={t("cursorBlink")} type="checkbox" checked={value.cursorBlink} onChange={(e) => update("cursorBlink", e.target.checked)} />
           </label>
         </div>
       </section>
       <section className="settings-section">
-        <h3>새 연결 기본값</h3>
+        <h3>{t("connectionDefaults")}</h3>
         <div className="settings-grid">
-          <label>기본 사용자<input aria-label="기본 사용자" value={value.defaultUser} onChange={(e) => update("defaultUser", e.target.value)} placeholder="ubuntu" /></label>
-          <label>기본 포트<input aria-label="기본 포트" type="number" min="1" max="65535" value={value.defaultPort} onChange={(e) => update("defaultPort", Number(e.target.value))} /></label>
-          <label>기본 인증방식<select aria-label="기본 인증방식" value={value.defaultAuthType} onChange={(e) => update("defaultAuthType", e.target.value as "password" | "key")}><option value="key">SSH 개인 키</option><option value="password">비밀번호</option></select></label>
+          <label>{t("defaultUser")}<input data-testid="default-user" aria-label={t("defaultUser")} value={value.defaultUser} onChange={(e) => update("defaultUser", e.target.value)} placeholder="ubuntu" /></label>
+          <label>{t("defaultPort")}<input aria-label={t("defaultPort")} type="number" min="1" max="65535" value={value.defaultPort} onChange={(e) => update("defaultPort", Number(e.target.value))} /></label>
+          <label>{t("defaultAuth")}<select aria-label={t("defaultAuth")} value={value.defaultAuthType} onChange={(e) => update("defaultAuthType", e.target.value as "password" | "key")}><option value="key">{t("sshKey")}</option><option value="password">{t("password")}</option></select></label>
         </div>
       </section>
       <section className="settings-section">
-        <h3>SSH 연결</h3>
+        <h3>{t("sshConnection")}</h3>
         <div className="settings-grid">
-          <label>KeepAlive 간격 (초, 0은 끔)<input aria-label="KeepAlive 간격" type="number" min="0" max="600" value={value.keepAliveInterval} onChange={(e) => update("keepAliveInterval", Number(e.target.value))} /></label>
+          <label>{t("keepAlive")}<input aria-label={t("keepAlive")} type="number" min="0" max="600" value={value.keepAliveInterval} onChange={(e) => update("keepAliveInterval", Number(e.target.value))} /></label>
         </div>
       </section>
       <section className="settings-section update-section">
-        <h3>앱 업데이트</h3>
+        <h3>{t("appUpdate")}</h3>
         <div className="update-card">
           <div>
             <b data-testid="app-version">Orbit SSH v{appVersion || "-"}</b>
             <small>
-              현재 설치 버전 · {architecture === "arm64" ? "Apple Silicon" : architecture === "x64" ? "Intel Mac" : architecture}
+              {t("installedVersion", { architecture: architecture === "arm64" ? "Apple Silicon" : architecture === "x64" ? "Intel Mac" : architecture })}
             </small>
           </div>
           <button
             type="button"
-            aria-label="업데이트 확인"
+            aria-label={t("checkUpdate")}
             onClick={onCheckUpdates}
             disabled={updateStatus.phase === "checking" || updateStatus.phase === "downloading"}
           >
             <RotateCw className={updateStatus.phase === "checking" ? "spinning" : ""} />
-            {updateStatus.phase === "checking" ? "확인 중" : "업데이트 확인"}
+            {updateStatus.phase === "checking" ? t("checking") : t("checkUpdate")}
           </button>
         </div>
         {updateInfo?.updateAvailable ? (
           <div className="update-result available">
             <div>
-              <b>v{updateInfo.latestVersion} 업데이트 사용 가능</b>
+              <b>{t("updateAvailable", { version: updateInfo.latestVersion })}</b>
               <small>
                 {updateInfo.assetName
-                  ? `${architecture === "arm64" ? "Apple Silicon" : "Intel Mac"}용 DMG를 받을 수 있습니다.`
-                  : "현재 Mac과 호환되는 DMG가 릴리즈에 없습니다."}
+                  ? t("compatibleDmg", { architecture: architecture === "arm64" ? "Apple Silicon" : "Intel Mac" })
+                  : t("noCompatibleDmg")}
               </small>
             </div>
             <div className="update-actions">
               <button type="button" onClick={onOpenRelease}>
-                <ExternalLink /> 릴리즈 노트
+                <ExternalLink /> {t("releaseNotes")}
               </button>
               <button
                 type="button"
@@ -365,24 +394,24 @@ function SettingsForm({
                 onClick={onDownloadUpdate}
                 disabled={!updateInfo.assetName || updateStatus.phase === "downloading"}
               >
-                <Download /> {updateStatus.phase === "downloading" ? `${updateStatus.percent ?? 0}%` : "DMG 받기"}
+                <Download /> {updateStatus.phase === "downloading" ? `${updateStatus.percent ?? 0}%` : t("downloadDmg")}
               </button>
             </div>
           </div>
         ) : updateInfo ? (
-          <p className="update-message">최신 버전을 사용하고 있습니다.</p>
+          <p className="update-message">{t("latestVersion")}</p>
         ) : null}
         {updateStatus.phase === "downloading" && (
-          <div className="update-progress" aria-label="업데이트 다운로드 진행률">
+          <div className="update-progress" aria-label={t("downloadProgress")}>
             <span style={{ width: `${updateStatus.percent ?? 0}%` }} />
           </div>
         )}
         {updateStatus.phase === "completed" && (
-          <p className="update-message success">DMG를 열었습니다. Orbit SSH를 Applications 폴더로 옮겨 설치해 주세요.</p>
+          <p className="update-message success">{t("dmgOpened")}</p>
         )}
         {updateError && <p className="update-message error">{updateError}</p>}
       </section>
-      <div className="modal-actions"><button type="button" onClick={onCancel}>취소</button><button className="primary">설정 저장</button></div>
+      <div className="modal-actions"><button type="button" onClick={onCancel}>{t("cancel")}</button><button className="primary">{t("saveSettings")}</button></div>
     </form>
   );
 }
@@ -419,6 +448,18 @@ function App() {
     identityFile: "",
     password: "",
   });
+  const language = settings.language;
+  const t = (key: MessageKey, values?: Record<string, string | number>) =>
+    translate(language, key, values);
+  const stateLabel = (state: SessionState) =>
+    t(
+      ({
+        connecting: "stateConnecting",
+        connected: "stateConnected",
+        closed: "stateClosed",
+        error: "stateError",
+      } as const)[state],
+    );
   const activeSession = sessions.find((s) => s.tabId === activeTabId);
   const activeWorkspaceId = activeSession?.workspaceId;
   const activeHost = store.hosts.find(
@@ -455,7 +496,7 @@ function App() {
       if (!active) return;
       setUpdateStatus(status);
       if (status.phase === "error")
-        setUpdateError(status.message ?? "업데이트 다운로드에 실패했습니다.");
+        setUpdateError(status.message ?? t("updateDownloadFailed"));
     });
     setUpdateStatus({ phase: "checking" });
     window.desktop.updates
@@ -472,7 +513,7 @@ function App() {
       active = false;
       off();
     };
-  }, [loaded]);
+  }, [loaded, language]);
   const checkUpdates = async () => {
     setUpdateError("");
     setUpdateStatus({ phase: "checking" });
@@ -484,7 +525,7 @@ function App() {
     } catch (error) {
       setUpdateStatus({ phase: "error" });
       setUpdateError(
-        error instanceof Error ? error.message : "업데이트 확인에 실패했습니다.",
+        error instanceof Error ? error.message : t("updateCheckFailed"),
       );
     }
   };
@@ -496,7 +537,7 @@ function App() {
     } catch (error) {
       setUpdateStatus({ phase: "error" });
       setUpdateError(
-        error instanceof Error ? error.message : "업데이트 다운로드에 실패했습니다.",
+        error instanceof Error ? error.message : t("updateDownloadFailed"),
       );
     }
   };
@@ -596,7 +637,7 @@ function App() {
     setDialog(null);
   };
   const removeHost = async (host: ConnectionHost) => {
-    if (!confirm(`“${host.name}” 서버를 삭제할까요?`)) return;
+    if (!confirm(t("deleteHostConfirm", { name: host.name }))) return;
     const targets = sessions.filter((s) => s.hostId === host.id);
     await Promise.all(
       targets.map((s) =>
@@ -615,10 +656,10 @@ function App() {
   };
   const removeGroup = async (group: ConnectionGroup) => {
     if (store.hosts.some((h) => h.groupId === group.id)) {
-      alert("폴더 안의 서버를 먼저 삭제하거나 이동해 주세요.");
+      alert(t("groupNotEmpty"));
       return;
     }
-    if (confirm(`“${group.name}” 폴더를 삭제할까요?`))
+    if (confirm(t("deleteGroupConfirm", { name: group.name })))
       await persist({
         ...store,
         groups: store.groups.filter((g) => g.id !== group.id),
@@ -791,7 +832,7 @@ function App() {
   if (!window.desktop)
     return (
       <div className="fatal">
-        이 화면은 데스크톱 앱에서 실행해야 합니다.
+        {t("desktopOnly")}
         <br />
         <code>npm run desktop</code>
       </div>
@@ -812,7 +853,7 @@ function App() {
           <Users />
         </button>
         <span />
-        <button aria-label="설정" title="설정 (⌘,)" onClick={openSettings}>
+        <button aria-label={t("settings")} title={`${t("settings")} (⌘,)`} onClick={openSettings}>
           <Settings />
         </button>
         <div className="avatar">SK</div>
@@ -820,7 +861,7 @@ function App() {
       <aside className="sidebar">
         <header>
           <div>
-            <p>WORKSPACE</p>
+            <p>{t("workspace").toUpperCase()}</p>
             <h1>Orbit SSH</h1>
           </div>
           <button>
@@ -830,28 +871,30 @@ function App() {
         <div className="search">
           <Search />
           <input
-            aria-label="서버 검색"
-            placeholder="Search servers..."
+            aria-label={t("searchServers")}
+            placeholder={t("searchPlaceholder")}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
           <kbd>⌘ K</kbd>
         </div>
         <div className="section-title">
-          <span>CONNECTIONS</span>
+          <span>{t("connections").toUpperCase()}</span>
           <div>
             <button
               className="quick-add"
-              title="새 폴더"
-              aria-label="새 폴더"
+              data-testid="new-folder"
+              title={t("newFolder")}
+              aria-label={t("newFolder")}
               onClick={() => setDialog("group")}
             >
               <FolderPlus />
             </button>
             <button
               className="quick-add"
-              title="새 커넥션"
-              aria-label="새 커넥션"
+              data-testid="new-connection"
+              title={t("newConnection")}
+              aria-label={t("newConnection")}
               onClick={() => openHostDialog()}
             >
               <Plus />
@@ -860,7 +903,7 @@ function App() {
         </div>
         <nav>
           {loaded && groups.length === 0 && (
-            <p className="no-connections">등록된 서버가 없습니다.</p>
+            <p className="no-connections">{t("noConnections")}</p>
           )}
           {groups.map((g, index) => (
             <div key={g.id} className="tree-group">
@@ -886,7 +929,7 @@ function App() {
                 </button>
                 <button
                   className="delete-group"
-                  title="폴더 삭제"
+                  title={t("deleteFolder")}
                   onClick={() => removeGroup(g)}
                 >
                   <Trash2 />
@@ -915,10 +958,10 @@ function App() {
                         </span>
                       </button>
                       <div className="host-actions">
-                        <button title="수정" onClick={() => openHostDialog(h)}>
+                        <button title={t("edit")} onClick={() => openHostDialog(h)}>
                           <Pencil />
                         </button>
-                        <button title="삭제" onClick={() => removeHost(h)}>
+                        <button title={t("delete")} onClick={() => removeHost(h)}>
                           <Trash2 />
                         </button>
                       </div>
@@ -929,7 +972,7 @@ function App() {
           ))}
         </nav>
         <button className="add-connection" onClick={() => openHostDialog()}>
-          <Plus /> New connection
+          <Plus /> {t("addConnection")}
         </button>
       </aside>
       <main className="workspace">
@@ -991,14 +1034,14 @@ function App() {
               </div>
               {activeSession ? (
                 <span className={`connection-state ${activeSession.state}`}>
-                  <i /> {activeSession.state.toUpperCase()}
+                  <i /> {stateLabel(activeSession.state)}
                 </span>
               ) : (
                 <button
                   className="connect-button"
                   onClick={() => connect(activeHost)}
                 >
-                  Connect
+                  {t("connect")}
                 </button>
               )}
               {activeSession &&
@@ -1007,7 +1050,7 @@ function App() {
                     className="reconnect"
                     onClick={() => reconnectPane(activeSession.tabId)}
                   >
-                    <RotateCw /> Reconnect
+                    <RotateCw /> {t("reconnect")}
                   </button>
                 )}
             </div>
@@ -1036,7 +1079,7 @@ function App() {
                           {host?.user}@{host?.host}
                         </small>
                         <button
-                          title="패널 닫기"
+                          title={t("closePane")}
                           onClick={(e) => {
                             e.stopPropagation();
                             closePane(session.tabId);
@@ -1048,6 +1091,7 @@ function App() {
                       <TerminalPane
                         session={session}
                         settings={settings}
+                        language={language}
                         active={activeTabId === session.tabId}
                         onState={(state) =>
                           setSessionState(session.tabId, state)
@@ -1062,16 +1106,16 @@ function App() {
             {!activeSession && (
               <div className="ready">
                 <TerminalSquare />
-                <h2>Ready to connect</h2>
-                <p>Connect를 누르면 시스템 SSH로 접속합니다.</p>
+                <h2>{t("readyToConnect")}</h2>
+                <p>{t("connectDescription")}</p>
                 <button onClick={() => connect(activeHost)}>
-                  Connect to {activeHost.name}
+                  {t("connectTo", { name: activeHost.name })}
                 </button>
               </div>
             )}
             <footer>
               <span>
-                <i /> SYSTEM OPENSSH
+                <i /> {t("systemOpenSsh")}
               </span>
               <span>UTF-8</span>
               <span>PTY · xterm-256color</span>
@@ -1081,17 +1125,17 @@ function App() {
         ) : (
           <div className="empty">
             <TerminalSquare />
-            <h2>{loaded ? "No active sessions" : "Loading..."}</h2>
-            <p>왼쪽에서 서버를 선택하거나 새 연결을 추가하세요.</p>
+            <h2>{loaded ? t("noActiveSessions") : t("loading")}</h2>
+            <p>{t("selectOrAddServer")}</p>
           </div>
         )}
       </main>
       {updateInfo?.updateAvailable && !updateDismissed && (
-        <aside className="update-toast" role="status" aria-label="새 업데이트 알림">
+        <aside className="update-toast" role="status" aria-label={t("updateNotice")}>
           <div className="update-toast-icon"><Download /></div>
           <div>
             <b>Orbit SSH v{updateInfo.latestVersion}</b>
-            <span>새 버전을 사용할 수 있습니다.</span>
+            <span>{t("newVersionAvailable")}</span>
           </div>
           <button
             type="button"
@@ -1099,9 +1143,9 @@ function App() {
             onClick={downloadUpdate}
             disabled={!updateInfo.assetName || updateStatus.phase === "downloading"}
           >
-            {updateStatus.phase === "downloading" ? `${updateStatus.percent ?? 0}%` : "DMG 받기"}
+            {updateStatus.phase === "downloading" ? `${updateStatus.percent ?? 0}%` : t("downloadDmg")}
           </button>
-          <button type="button" className="update-toast-close" aria-label="업데이트 알림 닫기" onClick={() => setUpdateDismissed(true)}>
+          <button type="button" className="update-toast-close" aria-label={t("dismissUpdate")} onClick={() => setUpdateDismissed(true)}>
             <X />
           </button>
         </aside>
@@ -1116,7 +1160,7 @@ function App() {
           <div className={`modal ${dialog === "settings" ? "settings-modal" : ""}`}>
             <button
               className="modal-close"
-              aria-label="닫기"
+              aria-label={t("close")}
               onClick={() => setDialog(null)}
             >
               <X />
@@ -1138,12 +1182,10 @@ function App() {
               />
             ) : dialog === "group" ? (
               <form onSubmit={submitGroup}>
-                <h2>새 폴더</h2>
-                <p>
-                  서버를 분류할 폴더를 만듭니다. ESC를 눌러 닫을 수 있습니다.
-                </p>
+                <h2>{t("newFolder")}</h2>
+                <p>{t("newFolderDescription")}</p>
                 <label>
-                  폴더 이름
+                  {t("folderName")}
                   <input
                     name="name"
                     autoFocus
@@ -1153,20 +1195,21 @@ function App() {
                 </label>
                 <div className="modal-actions">
                   <button type="button" onClick={() => setDialog(null)}>
-                    취소
+                    {t("cancel")}
                   </button>
-                  <button className="primary">만들기</button>
+                  <button className="primary">{t("create")}</button>
                 </div>
               </form>
             ) : (
               <form onSubmit={submitHost}>
-                <h2>{editing ? "연결 수정" : "새 SSH 연결"}</h2>
-                <p>실제 SSH 접속에 사용할 정보와 인증 방식을 입력하세요.</p>
+                <h2>{editing ? t("editConnection") : t("newSshConnection")}</h2>
+                <p>{t("connectionDescription")}</p>
                 <label>
-                  장비 이름
+                  {t("deviceName")}
                   <input
                     autoFocus
-                    aria-label="장비 이름"
+                    data-testid="device-name"
+                    aria-label={t("deviceName")}
                     value={form.name}
                     onChange={(e) => setForm({ ...form, name: e.target.value })}
                     placeholder="Production API"
@@ -1175,9 +1218,10 @@ function App() {
                 </label>
                 <div className="form-row">
                   <label>
-                    호스트
+                    {t("host")}
                     <input
-                      aria-label="호스트"
+                      data-testid="connection-host"
+                      aria-label={t("host")}
                       value={form.host}
                       onChange={(e) =>
                         setForm({ ...form, host: e.target.value })
@@ -1187,7 +1231,7 @@ function App() {
                     />
                   </label>
                   <label className="port">
-                    포트
+                    {t("port")}
                     <input
                       type="number"
                       min="1"
@@ -1200,9 +1244,10 @@ function App() {
                   </label>
                 </div>
                 <label>
-                  사용자
+                  {t("user")}
                   <input
-                    aria-label="사용자"
+                    data-testid="connection-user"
+                    aria-label={t("user")}
                     value={form.user}
                     onChange={(e) => setForm({ ...form, user: e.target.value })}
                     placeholder="ubuntu"
@@ -1210,7 +1255,7 @@ function App() {
                   />
                 </label>
                 <label>
-                  폴더
+                  {t("folder")}
                   <select
                     value={form.groupId}
                     onChange={(e) =>
@@ -1219,7 +1264,7 @@ function App() {
                     required
                   >
                     <option value="" disabled>
-                      폴더 선택
+                      {t("selectFolder")}
                     </option>
                     {store.groups.map((g) => (
                       <option key={g.id} value={g.id}>
@@ -1229,7 +1274,7 @@ function App() {
                   </select>
                 </label>
                 <fieldset className="auth-options">
-                  <legend>접속 방식</legend>
+                  <legend>{t("authMethod")}</legend>
                   <label
                     className={form.authType === "password" ? "selected" : ""}
                   >
@@ -1244,8 +1289,8 @@ function App() {
                     />
                     <LockKeyhole />
                     <span>
-                      <b>비밀번호</b>
-                      <small>macOS Keychain에 안전하게 저장</small>
+                      <b>{t("password")}</b>
+                      <small>{t("passwordKeychain")}</small>
                     </span>
                   </label>
                   <label className={form.authType === "key" ? "selected" : ""}>
@@ -1258,14 +1303,14 @@ function App() {
                     />
                     <KeyRound />
                     <span>
-                      <b>SSH 개인 키</b>
-                      <small>키 파일 또는 SSH Agent 사용</small>
+                      <b>{t("sshKey")}</b>
+                      <small>{t("keyOrAgent")}</small>
                     </span>
                   </label>
                 </fieldset>
                 {form.authType === "password" ? (
                   <label>
-                    비밀번호 {editing && <span>(변경할 때만 입력)</span>}
+                    {t("password")} {editing && <span>{t("onlyWhenChanging")}</span>}
                     <input
                       type="password"
                       value={form.password}
@@ -1273,7 +1318,7 @@ function App() {
                         setForm({ ...form, password: e.target.value })
                       }
                       placeholder={
-                        editing ? "기존 비밀번호 유지" : "SSH 비밀번호"
+                        editing ? t("keepExistingPassword") : t("sshPassword")
                       }
                       required={!editing}
                       autoComplete="new-password"
@@ -1281,8 +1326,8 @@ function App() {
                   </label>
                 ) : (
                   <label>
-                    SSH 개인 키 경로{" "}
-                    <span>(비우면 SSH Agent/기본 키 사용)</span>
+                    {t("privateKeyPath")}{" "}
+                    <span>{t("emptyUsesAgent")}</span>
                     <input
                       value={form.identityFile}
                       onChange={(e) =>
@@ -1294,10 +1339,10 @@ function App() {
                 )}
                 <div className="modal-actions">
                   <button type="button" onClick={() => setDialog(null)}>
-                    취소
+                    {t("cancel")}
                   </button>
                   <button className="primary">
-                    {editing ? "저장" : "추가"}
+                    {editing ? t("save") : t("add")}
                   </button>
                 </div>
               </form>

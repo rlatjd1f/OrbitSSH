@@ -14,6 +14,7 @@ type ConnectionHost = {
 };
 type ConnectionStore = { groups: ConnectionGroup[]; hosts: ConnectionHost[] };
 type AppSettings = {
+  language: "ko" | "en";
   terminalFontSize: number;
   terminalFontFamily: string;
   terminalLineHeight: number;

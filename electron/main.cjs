@@ -87,7 +87,9 @@ async function checkForUpdate(force = false) {
     },
   );
   if (!response.ok)
-    throw new Error(`GitHub 업데이트 확인 실패 (${response.status})`);
+    throw new Error(
+      `${mainText("GitHub 업데이트 확인 실패", "GitHub update check failed")} (${response.status})`,
+    );
 
   const release = await response.json();
   const latestVersion = String(release.tag_name ?? "").replace(/^v/i, "");
@@ -121,7 +123,12 @@ async function checkForUpdate(force = false) {
 
 function downloadAvailableUpdate(sender) {
   if (!availableUpdate)
-    throw new Error("다운로드할 업데이트가 없습니다.");
+    throw new Error(
+      mainText(
+        "다운로드할 업데이트가 없습니다.",
+        "There is no update available to download.",
+      ),
+    );
   const update = availableUpdate;
   const savePath = path.join(app.getPath("downloads"), update.assetName);
   return new Promise((resolve, reject) => {
@@ -152,7 +159,12 @@ function downloadAvailableUpdate(sender) {
       });
       item.once("done", async (_downloadEvent, state) => {
         if (state !== "completed") {
-          const error = new Error(`업데이트 다운로드가 ${state} 상태로 종료됐습니다.`);
+          const error = new Error(
+            mainText(
+              `업데이트 다운로드가 ${state} 상태로 종료됐습니다.`,
+              `The update download ended with status: ${state}.`,
+            ),
+          );
           send("update:status", { phase: "error", message: error.message });
           reject(error);
           return;
@@ -171,7 +183,14 @@ function downloadAvailableUpdate(sender) {
     timeout = setTimeout(() => {
       if (started) return;
       sender.session.removeListener("will-download", onDownload);
-      reject(new Error("업데이트 다운로드를 시작하지 못했습니다."));
+      reject(
+        new Error(
+          mainText(
+            "업데이트 다운로드를 시작하지 못했습니다.",
+            "The update download could not be started.",
+          ),
+        ),
+      );
     }, 10000);
     try {
       sender.downloadURL(update.assetUrl);
@@ -212,6 +231,7 @@ const defaults = {
   hosts: [],
 };
 const defaultSettings = {
+  language: "ko",
   terminalFontSize: 12,
   terminalFontFamily: "JetBrains Mono, Menlo, monospace",
   terminalLineHeight: 1.45,
@@ -233,17 +253,24 @@ const clamp = (value, min, max, fallback) => {
 
 function loadSettings() {
   try {
+    const stored = JSON.parse(fs.readFileSync(settingsPath(), "utf8"));
     return {
       ...defaultSettings,
-      ...JSON.parse(fs.readFileSync(settingsPath(), "utf8")),
+      ...stored,
+      language: stored.language === "en" ? "en" : "ko",
     };
   } catch {
     return { ...defaultSettings };
   }
 }
 
+function mainText(ko, en) {
+  return loadSettings().language === "en" ? en : ko;
+}
+
 function saveSettings(value) {
   const clean = {
+    language: value.language === "en" ? "en" : "ko",
     terminalFontSize: clamp(value.terminalFontSize, 9, 24, 12),
     terminalFontFamily:
       String(value.terminalFontFamily ?? "").trim().slice(0, 200) ||
@@ -403,7 +430,12 @@ function unregisterTerminalShortcut() {
 
 function startSession(host) {
   if (!host || !host.host || !host.user)
-    throw new Error("접속 정보가 올바르지 않습니다.");
+    throw new Error(
+      mainText(
+        "접속 정보가 올바르지 않습니다.",
+        "The connection details are invalid.",
+      ),
+    );
   if (process.env.ORBIT_UI_SELF_TEST === "1") terminalStartCount += 1;
   const sessionId = crypto.randomUUID();
   const settings = loadSettings();
@@ -483,7 +515,11 @@ function registerIpc() {
   ipcMain.handle("store:load", () => loadStore());
   ipcMain.handle("store:save", (_event, data) => saveStore(data));
   ipcMain.handle("settings:load", () => loadSettings());
-  ipcMain.handle("settings:save", (_event, value) => saveSettings(value));
+  ipcMain.handle("settings:save", (_event, value) => {
+    const saved = saveSettings(value);
+    installApplicationMenu(saved.language);
+    return saved;
+  });
   ipcMain.handle("terminal:start", (_event, host) => startSession(host));
   ipcMain.on("terminal:write", (_event, { sessionId, data }) => {
     if (process.env.ORBIT_UI_SELF_TEST === "1")
@@ -609,29 +645,76 @@ function createWindow() {
   registerTerminalShortcut();
 }
 
-function installApplicationMenu() {
+function installApplicationMenu(language = loadSettings().language) {
+  const ko = language !== "en";
+  const menuText = ko
+    ? {
+        about: "Orbit SSH 정보",
+        settings: "설정…",
+        hide: "Orbit SSH 가리기",
+        hideOthers: "다른 항목 가리기",
+        showAll: "모두 보기",
+        quit: "Orbit SSH 종료",
+        terminal: "터미널",
+        interrupt: "작업 중단",
+        showLog: "단축키 디버그 로그 보기",
+        edit: "편집",
+        undo: "실행 취소",
+        redo: "다시 실행",
+        copy: "복사",
+        paste: "붙여넣기",
+        selectAll: "전체 선택",
+        window: "윈도우",
+        minimize: "최소화",
+        zoom: "확대/축소",
+      }
+    : {
+        about: "About Orbit SSH",
+        settings: "Settings…",
+        hide: "Hide Orbit SSH",
+        hideOthers: "Hide Others",
+        showAll: "Show All",
+        quit: "Quit Orbit SSH",
+        terminal: "Terminal",
+        interrupt: "Interrupt",
+        showLog: "Show Shortcut Debug Log",
+        edit: "Edit",
+        undo: "Undo",
+        redo: "Redo",
+        copy: "Copy",
+        paste: "Paste",
+        selectAll: "Select All",
+        window: "Window",
+        minimize: "Minimize",
+        zoom: "Zoom",
+      };
   const template = [
     ...(process.platform === "darwin"
       ? [
           {
             label: app.name,
             submenu: [
-              { role: "about" },
+              { role: "about", label: menuText.about },
+              {
+                label: menuText.settings,
+                accelerator: "Command+,",
+                click: () => send("shortcut:action", "open-settings"),
+              },
               { type: "separator" },
-              { role: "hide" },
-              { role: "hideOthers" },
-              { role: "unhide" },
+              { role: "hide", label: menuText.hide },
+              { role: "hideOthers", label: menuText.hideOthers },
+              { role: "unhide", label: menuText.showAll },
               { type: "separator" },
-              { role: "quit" },
+              { role: "quit", label: menuText.quit },
             ],
           },
         ]
       : []),
     {
-      label: "Terminal",
+      label: menuText.terminal,
       submenu: [
         {
-          label: "Interrupt",
+          label: menuText.interrupt,
           sublabel: "Control+C",
           click: () => {
             logShortcut("menu:interrupt-clicked");
@@ -640,7 +723,7 @@ function installApplicationMenu() {
         },
         { type: "separator" },
         {
-          label: "Show Shortcut Debug Log",
+          label: menuText.showLog,
           click: () => {
             logShortcut("menu:show-log");
             shell.showItemInFolder(shortcutLogPath());
@@ -649,23 +732,26 @@ function installApplicationMenu() {
       ],
     },
     {
-      label: "Edit",
+      label: menuText.edit,
       submenu: [
-        { role: "undo", accelerator: "Command+Z" },
-        { role: "redo", accelerator: "Command+Shift+Z" },
+        { role: "undo", label: menuText.undo, accelerator: "Command+Z" },
+        { role: "redo", label: menuText.redo, accelerator: "Command+Shift+Z" },
         { type: "separator" },
         {
-          label: "Copy",
+          label: menuText.copy,
           accelerator: "Command+C",
           click: () => send("shortcut:action", "copy-selection"),
         },
-        { role: "paste", accelerator: "Command+V" },
-        { role: "selectAll", accelerator: "Command+A" },
+        { role: "paste", label: menuText.paste, accelerator: "Command+V" },
+        { role: "selectAll", label: menuText.selectAll, accelerator: "Command+A" },
       ],
     },
     {
-      label: "Window",
-      submenu: [{ role: "minimize" }, { role: "zoom" }],
+      label: menuText.window,
+      submenu: [
+        { role: "minimize", label: menuText.minimize },
+        { role: "zoom", label: menuText.zoom },
+      ],
     },
   ];
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
@@ -750,21 +836,33 @@ app.whenReady().then(() => {
         const settingsCheck = await mainWindow.webContents
           .executeJavaScript(`(async()=>{
           const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
-          const input=document.querySelector('input[aria-label="기본 사용자"]');
-          const font=document.querySelector('select[aria-label="터미널 폰트"]');
-          const scrollback=document.querySelector('input[aria-label="터미널 스크롤 버퍼"]');
+          const input=document.querySelector('[data-testid="default-user"]');
+          const font=document.querySelector('[data-testid="terminal-font"]');
+          const scrollback=document.querySelector('[data-testid="terminal-scrollback"]');
+          const language=document.querySelector('[data-testid="language-select"]');
           const appVersion=document.querySelector('[data-testid="app-version"]');
           const updateResult=[...document.querySelectorAll('.update-result b')].find(el=>el.textContent.includes('v0.2.0'));
-          const settingsOpened=Boolean(input&&font&&scrollback);
+          const settingsOpened=Boolean(input&&font&&scrollback&&language);
           const defaultScrollback=scrollback?.value==='5000';
           const fontColor=font?getComputedStyle(font).color:'';
           const labelFontSize=font?parseFloat(getComputedStyle(font.closest('label')).fontSize):0;
           const sectionFontSize=parseFloat(getComputedStyle(document.querySelector('.settings-section h3')).fontSize);
           const setValue=async(el,value)=>{const setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;setter.call(el,value);el.dispatchEvent(new Event('input',{bubbles:true}));await wait(30)};
           const setSelect=async(el,value)=>{const setter=Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value').set;setter.call(el,value);el.dispatchEvent(new Event('change',{bubbles:true}));await wait(30)};
-          if(settingsOpened){await setValue(input,'global-test-user');await setSelect(font,'Menlo, Monaco, monospace');await setValue(scrollback,'7000');[...document.querySelectorAll('button')].find(el=>el.textContent.includes('설정 저장')).click();await wait(100)}
-          return {settingsOpened,appVersionVisible:appVersion?.textContent.includes('v0.1.0'),updateAvailableVisible:Boolean(updateResult),fontOptionCount:font?.options.length,defaultScrollback,fontColor,labelFontSize,sectionFontSize,settingsClosed:!document.querySelector('.settings-modal')};
+          let englishPreview=false;
+          if(settingsOpened){await setValue(input,'global-test-user');await setSelect(font,'Menlo, Monaco, monospace');await setValue(scrollback,'7000');await setSelect(language,'en');englishPreview=document.querySelector('.settings-modal h2')?.textContent==='Settings'&&document.querySelector('[data-testid="default-user"]')?.getAttribute('aria-label')==='Default user';document.querySelector('.settings-modal .modal-actions .primary').click();await wait(100)}
+          const englishAppUi=document.querySelector('[data-testid="new-folder"]')?.getAttribute('aria-label')==='New folder'&&document.querySelector('.add-connection')?.textContent.includes('New connection')&&document.querySelector('.empty h2')?.textContent==='No active sessions'&&document.querySelector('.update-toast span')?.textContent==='A new version is available.';
+          document.querySelector('[data-testid="new-connection"]').click();await wait(30);
+          const englishConnectionUi=document.querySelector('.modal h2')?.textContent==='New SSH connection'&&document.querySelector('[data-testid="device-name"]')?.getAttribute('aria-label')==='Device name'&&document.querySelector('.auth-options legend')?.textContent==='Authentication method';
+          window.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape'}));await wait(30);
+          return {settingsOpened,englishPreview,englishAppUi,englishConnectionUi,appVersionVisible:appVersion?.textContent.includes('v0.1.0'),updateAvailableVisible:Boolean(updateResult),fontOptionCount:font?.options.length,defaultScrollback,fontColor,labelFontSize,sectionFontSize,settingsClosed:!document.querySelector('.settings-modal')};
         })()`);
+        const englishMenuLabels = Menu.getApplicationMenu()?.items.flatMap(
+          (item) => [
+            item.label,
+            ...(item.submenu?.items.map((child) => child.label) ?? []),
+          ],
+        );
         mainWindow.webContents.sendInputEvent({
           type: "keyDown",
           keyCode: ",",
@@ -776,10 +874,35 @@ app.whenReady().then(() => {
           modifiers: [settingsModifier],
         });
         await new Promise((resolve) => setTimeout(resolve, 80));
-        const settingsReopened =
-          await mainWindow.webContents.executeJavaScript(
-            `Boolean(document.querySelector('.settings-modal'))`,
-          );
+        const languageReset = await mainWindow.webContents.executeJavaScript(`(async()=>{
+          const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+          const language=document.querySelector('[data-testid="language-select"]');
+          const englishSettingsOpened=document.querySelector('.settings-modal h2')?.textContent==='Settings'&&language?.value==='en';
+          const setter=Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value').set;setter.call(language,'ko');language.dispatchEvent(new Event('change',{bubbles:true}));await wait(40);
+          const koreanPreview=document.querySelector('.settings-modal h2')?.textContent==='설정';
+          document.querySelector('.settings-modal .modal-actions .primary').click();await wait(100);
+          return {englishSettingsOpened,koreanPreview,closed:!document.querySelector('.settings-modal')};
+        })()`);
+        const koreanMenuLabels = Menu.getApplicationMenu()?.items.flatMap(
+          (item) => [
+            item.label,
+            ...(item.submenu?.items.map((child) => child.label) ?? []),
+          ],
+        );
+        mainWindow.webContents.sendInputEvent({
+          type: "keyDown",
+          keyCode: ",",
+          modifiers: [settingsModifier],
+        });
+        mainWindow.webContents.sendInputEvent({
+          type: "keyUp",
+          keyCode: ",",
+          modifiers: [settingsModifier],
+        });
+        await new Promise((resolve) => setTimeout(resolve, 80));
+        const settingsReopened = await mainWindow.webContents.executeJavaScript(
+          `Boolean(document.querySelector('.settings-modal'))`,
+        );
         mainWindow.webContents.sendInputEvent({
           type: "keyDown",
           keyCode: "Escape",
@@ -797,14 +920,14 @@ app.whenReady().then(() => {
         const result = await mainWindow.webContents
           .executeJavaScript(`(async()=>{
           const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms)); await wait(150);
-          document.querySelector('[aria-label="새 폴더"]').click(); await wait(20);
+          document.querySelector('[data-testid="new-folder"]').click(); await wait(20);
           const folderOpened=Boolean(document.querySelector('.modal'));
           window.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape'})); await wait(20);
           const escapeClosed=!document.querySelector('.modal');
-          document.querySelector('[aria-label="새 커넥션"]').click(); await wait(20);
-          const equipmentName=document.querySelector('input[aria-label="장비 이름"]');
-          const connectionHost=document.querySelector('input[aria-label="호스트"]');
-          const connectionUser=document.querySelector('input[aria-label="사용자"]');
+          document.querySelector('[data-testid="new-connection"]').click(); await wait(20);
+          const equipmentName=document.querySelector('[data-testid="device-name"]');
+          const connectionHost=document.querySelector('[data-testid="connection-host"]');
+          const connectionUser=document.querySelector('[data-testid="connection-user"]');
           const equipmentNameBlank=equipmentName?.value==='';
           const hostDefaultsToAny=connectionHost?.value==='0.0.0.0';
           const userBlank=connectionUser?.value==='';
@@ -828,12 +951,34 @@ app.whenReady().then(() => {
         })()`);
         result.settingsShortcut =
           settingsCheck.settingsOpened && settingsCheck.settingsClosed;
+        result.englishLanguagePreview = settingsCheck.englishPreview;
+        result.englishAppUi = settingsCheck.englishAppUi;
+        result.englishConnectionUi = settingsCheck.englishConnectionUi;
+        result.englishMenu =
+          englishMenuLabels?.includes("Terminal") &&
+          englishMenuLabels?.includes("Edit") &&
+          englishMenuLabels?.includes("Window") &&
+          englishMenuLabels?.includes("Settings…") &&
+          englishMenuLabels?.includes("Interrupt") &&
+          englishMenuLabels?.includes("Copy");
+        result.koreanLanguageRestored =
+          languageReset.englishSettingsOpened &&
+          languageReset.koreanPreview &&
+          languageReset.closed;
+        result.koreanMenu =
+          koreanMenuLabels?.includes("터미널") &&
+          koreanMenuLabels?.includes("편집") &&
+          koreanMenuLabels?.includes("윈도우") &&
+          koreanMenuLabels?.includes("설정…") &&
+          koreanMenuLabels?.includes("작업 중단") &&
+          koreanMenuLabels?.includes("복사");
         result.appVersionVisible = settingsCheck.appVersionVisible;
         result.updateAvailableVisible = settingsCheck.updateAvailableVisible;
         result.settingsEscapeClosed = settingsEscapeClosed;
         const persistedSettings = loadSettings();
         result.settingsPersisted =
           persistedSettings.defaultUser === "global-test-user" &&
+          persistedSettings.language === "ko" &&
           persistedSettings.terminalFontFamily === "Menlo, Monaco, monospace" &&
           persistedSettings.scrollback === 7000;
         result.defaultScrollback = settingsCheck.defaultScrollback;
@@ -1074,6 +1219,12 @@ app.whenReady().then(() => {
           );
         const passed =
           result.settingsShortcut &&
+          result.englishLanguagePreview &&
+          result.englishAppUi &&
+          result.englishConnectionUi &&
+          result.englishMenu &&
+          result.koreanLanguageRestored &&
+          result.koreanMenu &&
           result.appVersionVisible &&
           result.updateAvailableVisible &&
           result.settingsEscapeClosed &&
