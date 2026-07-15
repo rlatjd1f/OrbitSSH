@@ -90,6 +90,23 @@ Release-Note-KO: 분할된 터미널 사이를 이동할 때 입력 포커스를
 - macOS ARM64 DMG
 - macOS Intel x64 DMG
 
+### 🍎 Mac에 맞는 설치 파일 선택
+
+- **Apple Silicon Mac:** M1, M2, M3, M4 등 Apple 칩을 사용하는 Mac은 `OrbitSSH-<버전>-arm64.dmg`를 받습니다.
+- **Intel Mac:** Intel 프로세서를 사용하는 Mac은 `OrbitSSH-<버전>-x64.dmg`를 받습니다.
+- `Source code (zip)`과 `Source code (tar.gz)`는 개발용 소스 코드이며 일반 앱 설치 파일이 아닙니다.
+
+Mac 종류는 화면 왼쪽 위의 **Apple 메뉴() → 이 Mac에 관하여**에서 확인할 수 있습니다. `칩` 항목에 Apple M 시리즈가 표시되면 Apple Silicon이고, `프로세서` 항목에 Intel이 표시되면 Intel Mac입니다.
+
+터미널에서는 다음 명령으로도 확인할 수 있습니다.
+
+```bash
+uname -m
+```
+
+- `arm64`: Apple Silicon용 DMG 선택
+- `x86_64`: Intel용 DMG 선택
+
 태그는 `package.json`의 버전과 일치해야 합니다. 예를 들어 버전이 `0.1.0`이면 다음과 같이 릴리즈합니다.
 
 ```bash

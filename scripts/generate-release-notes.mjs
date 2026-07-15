@@ -93,4 +93,17 @@ if (previousTag) {
   );
 }
 
+lines.push(
+  "## 🍎 Mac에 맞는 설치 파일 선택",
+  "",
+  "- **Apple Silicon Mac(M1, M2, M3, M4 등):** 파일명에 `arm64`가 포함된 DMG를 받으세요.",
+  "- **Intel Mac:** 파일명에 `x64`가 포함된 DMG를 받으세요.",
+  "- `Source code (zip)`과 `Source code (tar.gz)`는 개발용 소스 코드이며 일반 앱 설치 파일이 아닙니다.",
+  "",
+  "Mac 종류는 **Apple 메뉴() → 이 Mac에 관하여**에서 확인할 수 있습니다. `칩`에 Apple M 시리즈가 표시되면 Apple Silicon이고, `프로세서`에 Intel이 표시되면 Intel Mac입니다.",
+  "",
+  "터미널에서 `uname -m`을 실행했을 때 `arm64`이면 Apple Silicon용, `x86_64`이면 Intel용 DMG를 선택하세요.",
+  "",
+);
+
 process.stdout.write(`${lines.join("\n").trimEnd()}\n`);
