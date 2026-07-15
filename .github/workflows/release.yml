@@ -51,15 +51,13 @@ jobs:
         run: npm run build
 
       - name: Package macOS application
-        run: npx electron-builder --mac dmg zip --${{ matrix.arch }} --publish never
+        run: npx electron-builder --mac dmg --${{ matrix.arch }} --publish never
 
       - name: Upload installers
         uses: actions/upload-artifact@v7
         with:
           name: OrbitSSH-${{ matrix.arch }}
-          path: |
-            release/*.dmg
-            release/*.zip
+          path: release/*.dmg
           if-no-files-found: error
 
   release:
@@ -67,11 +65,22 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
+      - name: Check out source and tags
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
       - name: Download installers
         uses: actions/download-artifact@v8
         with:
           path: release
           merge-multiple: true
+
+      - name: Generate release notes
+        run: |
+          PREVIOUS_TAG="$(git tag --list 'v[0-9]*' --sort=-version:refname | awk -v current="$GITHUB_REF_NAME" '$0 != current { print; exit }')"
+          node scripts/generate-release-notes.mjs "$PREVIOUS_TAG" "$GITHUB_REF_NAME" > release-notes.md
+          cat release-notes.md
 
       - name: Create or update release
         env:
@@ -80,8 +89,14 @@ jobs:
           TAG="$GITHUB_REF_NAME"
           TITLE="Orbit SSH $TAG"
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release upload "$TAG" release/* --clobber --repo "$GITHUB_REPOSITORY"
-            gh release edit "$TAG" --title "$TITLE" --repo "$GITHUB_REPOSITORY"
+            gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' | while read -r ASSET; do
+              case "$ASSET" in
+                *.dmg) ;;
+                *) gh release delete-asset "$TAG" "$ASSET" --yes --repo "$GITHUB_REPOSITORY" ;;
+              esac
+            done
+            gh release upload "$TAG" release/*.dmg --clobber --repo "$GITHUB_REPOSITORY"
+            gh release edit "$TAG" --title "$TITLE" --notes-file release-notes.md --repo "$GITHUB_REPOSITORY"
           else
-            gh release create "$TAG" release/* --verify-tag --generate-notes --title "$TITLE" --repo "$GITHUB_REPOSITORY"
+            gh release create "$TAG" release/*.dmg --verify-tag --title "$TITLE" --notes-file release-notes.md --repo "$GITHUB_REPOSITORY"
           fi

@@ -12,7 +12,7 @@
     "dev": "vite",
     "desktop": "concurrently -k \"vite --host 127.0.0.1\" \"wait-on http://127.0.0.1:5173 && electron .\"",
     "build": "tsc -b && vite build",
-    "dist:mac": "npm run build && electron-builder --mac dmg zip --publish never",
+    "dist:mac": "npm run build && electron-builder --mac dmg --publish never",
     "rebuild:native": "electron-builder install-app-deps",
     "desktop:prod": "npm run build && electron .",
     "preview": "vite preview",
@@ -37,8 +37,7 @@
     "mac": {
       "category": "public.app-category.developer-tools",
       "target": [
-        "dmg",
-        "zip"
+        "dmg"
       ]
     }
   },

@@ -54,7 +54,7 @@ node-pty의 Electron 네이티브 모듈을 다시 빌드해야 하는 경우에
 npm run rebuild:native
 ```
 
-macOS 설치 파일을 로컬에서 생성하려면 다음 명령을 사용합니다. 생성된 DMG와 ZIP 파일은 `release/`에 저장됩니다.
+macOS 설치 파일을 로컬에서 생성하려면 다음 명령을 사용합니다. 생성된 DMG 파일은 `release/`에 저장됩니다.
 
 ```bash
 npm run dist:mac
@@ -65,8 +65,16 @@ npm run dist:mac
 `v`로 시작하는 버전 태그가 원격에 푸시될 때만 GitHub Actions가 다음 작업을 수행합니다. 일반 브랜치 커밋이나 `main` 푸시만으로는 릴리즈가 생성되지 않습니다.
 
 1. ARM64 및 Intel x64 macOS 러너에서 애플리케이션을 각각 빌드합니다.
-2. 각 아키텍처용 DMG와 ZIP 파일을 생성합니다.
-3. 푸시된 버전 태그를 기준으로 GitHub Release를 생성합니다.
+2. 각 아키텍처용 DMG 파일을 생성합니다.
+3. 이전 버전 태그부터 현재 태그까지의 커밋을 유형별로 정리한 릴리즈 노트를 생성합니다.
+4. 푸시된 버전 태그를 기준으로 GitHub Release를 생성합니다.
+
+각 릴리즈에는 다음 네 가지 다운로드 항목만 표시됩니다.
+
+- 소스 코드 ZIP(GitHub 자동 생성)
+- 소스 코드 TAR.GZ(GitHub 자동 생성)
+- macOS ARM64 DMG
+- macOS Intel x64 DMG
 
 태그는 `package.json`의 버전과 일치해야 합니다. 예를 들어 버전이 `0.1.0`이면 다음과 같이 릴리즈합니다.
 
@@ -78,7 +86,7 @@ git push origin v0.1.0
 버전을 올리고 커밋과 태그를 함께 생성하려면 npm의 버전 명령을 사용할 수 있습니다.
 
 ```bash
-npm version patch
+npm version patch -m "chore(release): v%s"
 git push origin main --follow-tags
 ```
 
