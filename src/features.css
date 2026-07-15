@@ -471,6 +471,8 @@
 }
 .settings-modal {
   width: 600px;
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
 }
 .settings-section {
   padding: 15px 0 17px;
@@ -533,6 +535,176 @@
   width: 16px;
   height: 16px;
   accent-color: #6c5ce7;
+}
+.update-card,
+.update-result {
+  border: 1px solid #303540;
+  border-radius: 7px;
+  background: #111319;
+  padding: 12px;
+}
+.update-card,
+.update-result,
+.update-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.update-card > div,
+.update-result > div:first-child {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+}
+.update-card b,
+.update-result b {
+  color: #e6e8ef;
+  font-size: 13px;
+}
+.update-card small,
+.update-result small {
+  color: #858d9c;
+  font-size: 10px;
+  line-height: 1.4;
+}
+.update-card button,
+.update-actions button {
+  border: 1px solid #343946;
+  border-radius: 6px;
+  background: #1a1d25;
+  color: #c9ced8;
+  height: 32px;
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.update-card button:hover,
+.update-actions button:hover {
+  border-color: #565e70;
+  color: #fff;
+}
+.update-card button:disabled,
+.update-actions button:disabled,
+.update-toast button:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+.update-card button svg,
+.update-actions button svg {
+  width: 13px;
+  height: 13px;
+}
+.update-result {
+  margin-top: 9px;
+  border-color: #50478d;
+  background: #181628;
+}
+.update-actions button.primary {
+  border-color: #6c5ce7;
+  background: #6c5ce7;
+  color: #fff;
+}
+.update-progress {
+  height: 4px;
+  margin: 9px 2px 0;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #292d36;
+}
+.update-progress span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #7565f2;
+  transition: width 120ms ease;
+}
+.update-message {
+  margin: 9px 2px 0 !important;
+  color: #949baa !important;
+  font-size: 11px !important;
+}
+.update-message.success {
+  color: #62d6aa !important;
+}
+.update-message.error {
+  color: #ff7b82 !important;
+}
+.spinning {
+  animation: update-spin 0.9s linear infinite;
+}
+@keyframes update-spin {
+  to { transform: rotate(360deg); }
+}
+.update-toast {
+  position: fixed;
+  right: 18px;
+  bottom: 30px;
+  z-index: 30;
+  min-width: 350px;
+  max-width: 430px;
+  padding: 12px;
+  border: 1px solid #454063;
+  border-radius: 9px;
+  background: #191b23;
+  box-shadow: 0 14px 38px #0009;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.update-toast-icon {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: #282343;
+  color: #8d7fff;
+}
+.update-toast-icon svg {
+  width: 17px;
+}
+.update-toast > div:nth-child(2) {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.update-toast b {
+  color: #f0f1f5;
+  font-size: 12px;
+}
+.update-toast span {
+  color: #959caa;
+  font-size: 10px;
+}
+.update-toast button {
+  border: 0;
+  color: #d9dce3;
+}
+.update-toast-download {
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 6px !important;
+  background: #6c5ce7;
+  font-size: 11px;
+}
+.update-toast-close {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  background: transparent;
+}
+.update-toast-close svg {
+  width: 13px;
 }
 @media (max-height: 760px) {
   .settings-modal {

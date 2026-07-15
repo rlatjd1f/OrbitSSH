@@ -4,6 +4,7 @@ const {
   globalShortcut,
   ipcMain,
   Menu,
+  net,
   shell,
 } = require("electron");
 const path = require("node:path");
@@ -22,6 +23,165 @@ let activeTerminalSessionId = null;
 let physicalControlDown = false;
 let lastPhysicalControlUpAt = 0;
 let remappedControlCActive = false;
+let availableUpdate = null;
+let cachedUpdateResult = null;
+let lastUpdateCheckAt = 0;
+
+const updateRepository = "rlatjd1f/OrbitSSH";
+
+function versionParts(value) {
+  return String(value)
+    .replace(/^v/i, "")
+    .split("-")[0]
+    .split(".")
+    .map((part) => Number(part) || 0);
+}
+
+function isNewerVersion(latest, current) {
+  const latestParts = versionParts(latest);
+  const currentParts = versionParts(current);
+  const length = Math.max(latestParts.length, currentParts.length, 3);
+  for (let index = 0; index < length; index += 1) {
+    const difference =
+      (latestParts[index] ?? 0) - (currentParts[index] ?? 0);
+    if (difference !== 0) return difference > 0;
+  }
+  return false;
+}
+
+async function checkForUpdate(force = false) {
+  const currentVersion = app.getVersion();
+  if (process.env.ORBIT_UI_SELF_TEST === "1") {
+    availableUpdate = {
+      assetUrl: `https://github.com/rlatjd1f/OrbitSSH/releases/download/v0.2.0/OrbitSSH-0.2.0-${process.arch}.dmg`,
+      assetName: `OrbitSSH-0.2.0-${process.arch}.dmg`,
+      releaseUrl: "https://github.com/rlatjd1f/OrbitSSH/releases/tag/v0.2.0",
+    };
+    return {
+      currentVersion,
+      updateAvailable: true,
+      latestVersion: "0.2.0",
+      tagName: "v0.2.0",
+      releaseName: "Orbit SSH v0.2.0",
+      releaseNotes: "## 🚀 업데이트 내역\n\n- 업데이트 테스트",
+      releaseUrl: availableUpdate.releaseUrl,
+      assetName: availableUpdate.assetName,
+      architecture: process.arch,
+    };
+  }
+  if (
+    !force &&
+    cachedUpdateResult &&
+    Date.now() - lastUpdateCheckAt < 5 * 60 * 1000
+  )
+    return cachedUpdateResult;
+
+  const response = await net.fetch(
+    `https://api.github.com/repos/${updateRepository}/releases/latest`,
+    {
+      headers: {
+        Accept: "application/vnd.github+json",
+        "User-Agent": `OrbitSSH/${currentVersion}`,
+        "X-GitHub-Api-Version": "2022-11-28",
+      },
+    },
+  );
+  if (!response.ok)
+    throw new Error(`GitHub 업데이트 확인 실패 (${response.status})`);
+
+  const release = await response.json();
+  const latestVersion = String(release.tag_name ?? "").replace(/^v/i, "");
+  const updateAvailable = isNewerVersion(latestVersion, currentVersion);
+  const assetName = `OrbitSSH-${latestVersion}-${process.arch}.dmg`;
+  const asset = Array.isArray(release.assets)
+    ? release.assets.find((item) => item.name === assetName)
+    : null;
+  availableUpdate =
+    updateAvailable && asset
+      ? {
+          assetUrl: asset.browser_download_url,
+          assetName,
+          releaseUrl: release.html_url,
+        }
+      : null;
+  cachedUpdateResult = {
+    currentVersion,
+    updateAvailable,
+    latestVersion,
+    tagName: release.tag_name,
+    releaseName: release.name || release.tag_name,
+    releaseNotes: release.body || "",
+    releaseUrl: release.html_url,
+    assetName: asset?.name ?? null,
+    architecture: process.arch,
+  };
+  lastUpdateCheckAt = Date.now();
+  return cachedUpdateResult;
+}
+
+function downloadAvailableUpdate(sender) {
+  if (!availableUpdate)
+    throw new Error("다운로드할 업데이트가 없습니다.");
+  const update = availableUpdate;
+  const savePath = path.join(app.getPath("downloads"), update.assetName);
+  return new Promise((resolve, reject) => {
+    let started = false;
+    let timeout;
+    const onDownload = (_event, item) => {
+      if (!item.getURLChain().includes(update.assetUrl)) return;
+      started = true;
+      clearTimeout(timeout);
+      sender.session.removeListener("will-download", onDownload);
+      item.setSavePath(savePath);
+      send("update:status", {
+        phase: "downloading",
+        percent: 0,
+        fileName: update.assetName,
+      });
+      item.on("updated", (_downloadEvent, state) => {
+        if (state !== "progressing") return;
+        const total = item.getTotalBytes();
+        const received = item.getReceivedBytes();
+        send("update:status", {
+          phase: "downloading",
+          percent: total > 0 ? Math.round((received / total) * 100) : 0,
+          received,
+          total,
+          fileName: update.assetName,
+        });
+      });
+      item.once("done", async (_downloadEvent, state) => {
+        if (state !== "completed") {
+          const error = new Error(`업데이트 다운로드가 ${state} 상태로 종료됐습니다.`);
+          send("update:status", { phase: "error", message: error.message });
+          reject(error);
+          return;
+        }
+        const openError = await shell.openPath(savePath);
+        send("update:status", {
+          phase: "completed",
+          percent: 100,
+          path: savePath,
+          opened: !openError,
+        });
+        resolve({ path: savePath, opened: !openError, openError });
+      });
+    };
+    sender.session.on("will-download", onDownload);
+    timeout = setTimeout(() => {
+      if (started) return;
+      sender.session.removeListener("will-download", onDownload);
+      reject(new Error("업데이트 다운로드를 시작하지 못했습니다."));
+    }, 10000);
+    try {
+      sender.downloadURL(update.assetUrl);
+    } catch (error) {
+      clearTimeout(timeout);
+      sender.session.removeListener("will-download", onDownload);
+      reject(error);
+    }
+  });
+}
 
 const shortcutLogPath = () =>
   path.join(app.getPath("userData"), "shortcut-debug.log");
@@ -306,6 +466,20 @@ function startSession(host) {
 }
 
 function registerIpc() {
+  ipcMain.handle("app:get-version", () => app.getVersion());
+  ipcMain.handle("update:check", (_event, force) =>
+    checkForUpdate(Boolean(force)),
+  );
+  ipcMain.handle("update:download", (event) =>
+    downloadAvailableUpdate(event.sender),
+  );
+  ipcMain.handle("update:open-release", async () => {
+    await shell.openExternal(
+      availableUpdate?.releaseUrl ??
+        cachedUpdateResult?.releaseUrl ??
+        `https://github.com/${updateRepository}/releases/latest`,
+    );
+  });
   ipcMain.handle("store:load", () => loadStore());
   ipcMain.handle("store:save", (_event, data) => saveStore(data));
   ipcMain.handle("settings:load", () => loadSettings());
@@ -579,6 +753,8 @@ app.whenReady().then(() => {
           const input=document.querySelector('input[aria-label="기본 사용자"]');
           const font=document.querySelector('select[aria-label="터미널 폰트"]');
           const scrollback=document.querySelector('input[aria-label="터미널 스크롤 버퍼"]');
+          const appVersion=document.querySelector('[data-testid="app-version"]');
+          const updateResult=[...document.querySelectorAll('.update-result b')].find(el=>el.textContent.includes('v0.2.0'));
           const settingsOpened=Boolean(input&&font&&scrollback);
           const defaultScrollback=scrollback?.value==='5000';
           const fontColor=font?getComputedStyle(font).color:'';
@@ -587,7 +763,7 @@ app.whenReady().then(() => {
           const setValue=async(el,value)=>{const setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;setter.call(el,value);el.dispatchEvent(new Event('input',{bubbles:true}));await wait(30)};
           const setSelect=async(el,value)=>{const setter=Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value').set;setter.call(el,value);el.dispatchEvent(new Event('change',{bubbles:true}));await wait(30)};
           if(settingsOpened){await setValue(input,'global-test-user');await setSelect(font,'Menlo, Monaco, monospace');await setValue(scrollback,'7000');[...document.querySelectorAll('button')].find(el=>el.textContent.includes('설정 저장')).click();await wait(100)}
-          return {settingsOpened,fontOptionCount:font?.options.length,defaultScrollback,fontColor,labelFontSize,sectionFontSize,settingsClosed:!document.querySelector('.settings-modal')};
+          return {settingsOpened,appVersionVisible:appVersion?.textContent.includes('v0.1.0'),updateAvailableVisible:Boolean(updateResult),fontOptionCount:font?.options.length,defaultScrollback,fontColor,labelFontSize,sectionFontSize,settingsClosed:!document.querySelector('.settings-modal')};
         })()`);
         mainWindow.webContents.sendInputEvent({
           type: "keyDown",
@@ -652,6 +828,8 @@ app.whenReady().then(() => {
         })()`);
         result.settingsShortcut =
           settingsCheck.settingsOpened && settingsCheck.settingsClosed;
+        result.appVersionVisible = settingsCheck.appVersionVisible;
+        result.updateAvailableVisible = settingsCheck.updateAvailableVisible;
         result.settingsEscapeClosed = settingsEscapeClosed;
         const persistedSettings = loadSettings();
         result.settingsPersisted =
@@ -896,6 +1074,8 @@ app.whenReady().then(() => {
           );
         const passed =
           result.settingsShortcut &&
+          result.appVersionVisible &&
+          result.updateAvailableVisible &&
           result.settingsEscapeClosed &&
           result.settingsPersisted &&
           result.defaultScrollback &&

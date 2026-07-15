@@ -24,11 +24,40 @@ type AppSettings = {
   defaultAuthType: "password" | "key";
   keepAliveInterval: number;
 };
+type UpdateInfo = {
+  currentVersion: string;
+  updateAvailable: boolean;
+  latestVersion: string;
+  tagName: string;
+  releaseName: string;
+  releaseNotes: string;
+  releaseUrl: string;
+  assetName: string | null;
+  architecture: string;
+};
+type UpdateStatus = {
+  phase: "idle" | "checking" | "downloading" | "completed" | "error";
+  percent?: number;
+  received?: number;
+  total?: number;
+  fileName?: string;
+  path?: string;
+  opened?: boolean;
+  message?: string;
+};
 
 interface Window {
   desktop?: {
     platform: string;
+    architecture: string;
     isDesktop: boolean;
+    app: { getVersion(): Promise<string> };
+    updates: {
+      check(force?: boolean): Promise<UpdateInfo>;
+      download(): Promise<{ path: string; opened: boolean; openError: string }>;
+      openRelease(): Promise<void>;
+      onStatus(callback: (value: UpdateStatus) => void): () => void;
+    };
     store: {
       load(): Promise<ConnectionStore>;
       save(data: ConnectionStore): Promise<ConnectionStore>;

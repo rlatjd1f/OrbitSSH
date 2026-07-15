@@ -2,7 +2,21 @@ const { clipboard, contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("desktop", {
   platform: process.platform,
+  architecture: process.arch,
   isDesktop: true,
+  app: {
+    getVersion: () => ipcRenderer.invoke("app:get-version"),
+  },
+  updates: {
+    check: (force = false) => ipcRenderer.invoke("update:check", force),
+    download: () => ipcRenderer.invoke("update:download"),
+    openRelease: () => ipcRenderer.invoke("update:open-release"),
+    onStatus: (callback) => {
+      const fn = (_event, value) => callback(value);
+      ipcRenderer.on("update:status", fn);
+      return () => ipcRenderer.removeListener("update:status", fn);
+    },
+  },
   store: {
     load: () => ipcRenderer.invoke("store:load"),
     save: (data) => ipcRenderer.invoke("store:save", data),

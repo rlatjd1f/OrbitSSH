@@ -6,7 +6,9 @@ import {
   ChevronDown,
   ChevronRight,
   Command,
+  Download,
   Ellipsis,
+  ExternalLink,
   Folder,
   FolderPlus,
   KeyRound,
@@ -238,14 +240,30 @@ function TerminalPane({
 
 function SettingsForm({
   value,
+  appVersion,
+  architecture,
+  updateInfo,
+  updateStatus,
+  updateError,
   onChange,
   onSubmit,
   onCancel,
+  onCheckUpdates,
+  onDownloadUpdate,
+  onOpenRelease,
 }: {
   value: AppSettings;
+  appVersion: string;
+  architecture: string;
+  updateInfo: UpdateInfo | null;
+  updateStatus: UpdateStatus;
+  updateError: string;
   onChange: (value: AppSettings) => void;
   onSubmit: (event: FormEvent) => void;
   onCancel: () => void;
+  onCheckUpdates: () => void;
+  onDownloadUpdate: () => void;
+  onOpenRelease: () => void;
 }) {
   const update = <K extends keyof AppSettings>(key: K, next: AppSettings[K]) =>
     onChange({ ...value, [key]: next });
@@ -308,6 +326,62 @@ function SettingsForm({
           <label>KeepAlive 간격 (초, 0은 끔)<input aria-label="KeepAlive 간격" type="number" min="0" max="600" value={value.keepAliveInterval} onChange={(e) => update("keepAliveInterval", Number(e.target.value))} /></label>
         </div>
       </section>
+      <section className="settings-section update-section">
+        <h3>앱 업데이트</h3>
+        <div className="update-card">
+          <div>
+            <b data-testid="app-version">Orbit SSH v{appVersion || "-"}</b>
+            <small>
+              현재 설치 버전 · {architecture === "arm64" ? "Apple Silicon" : architecture === "x64" ? "Intel Mac" : architecture}
+            </small>
+          </div>
+          <button
+            type="button"
+            aria-label="업데이트 확인"
+            onClick={onCheckUpdates}
+            disabled={updateStatus.phase === "checking" || updateStatus.phase === "downloading"}
+          >
+            <RotateCw className={updateStatus.phase === "checking" ? "spinning" : ""} />
+            {updateStatus.phase === "checking" ? "확인 중" : "업데이트 확인"}
+          </button>
+        </div>
+        {updateInfo?.updateAvailable ? (
+          <div className="update-result available">
+            <div>
+              <b>v{updateInfo.latestVersion} 업데이트 사용 가능</b>
+              <small>
+                {updateInfo.assetName
+                  ? `${architecture === "arm64" ? "Apple Silicon" : "Intel Mac"}용 DMG를 받을 수 있습니다.`
+                  : "현재 Mac과 호환되는 DMG가 릴리즈에 없습니다."}
+              </small>
+            </div>
+            <div className="update-actions">
+              <button type="button" onClick={onOpenRelease}>
+                <ExternalLink /> 릴리즈 노트
+              </button>
+              <button
+                type="button"
+                className="primary"
+                onClick={onDownloadUpdate}
+                disabled={!updateInfo.assetName || updateStatus.phase === "downloading"}
+              >
+                <Download /> {updateStatus.phase === "downloading" ? `${updateStatus.percent ?? 0}%` : "DMG 받기"}
+              </button>
+            </div>
+          </div>
+        ) : updateInfo ? (
+          <p className="update-message">최신 버전을 사용하고 있습니다.</p>
+        ) : null}
+        {updateStatus.phase === "downloading" && (
+          <div className="update-progress" aria-label="업데이트 다운로드 진행률">
+            <span style={{ width: `${updateStatus.percent ?? 0}%` }} />
+          </div>
+        )}
+        {updateStatus.phase === "completed" && (
+          <p className="update-message success">DMG를 열었습니다. Orbit SSH를 Applications 폴더로 옮겨 설치해 주세요.</p>
+        )}
+        {updateError && <p className="update-message error">{updateError}</p>}
+      </section>
       <div className="modal-actions"><button type="button" onClick={onCancel}>취소</button><button className="primary">설정 저장</button></div>
     </form>
   );
@@ -328,6 +402,13 @@ function App() {
   const [settings, setSettings] = useState<AppSettings>(defaultSettings);
   const [settingsDraft, setSettingsDraft] =
     useState<AppSettings>(defaultSettings);
+  const [appVersion, setAppVersion] = useState("");
+  const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
+  const [updateStatus, setUpdateStatus] = useState<UpdateStatus>({
+    phase: "idle",
+  });
+  const [updateError, setUpdateError] = useState("");
+  const [updateDismissed, setUpdateDismissed] = useState(false);
   const [form, setForm] = useState({
     name: "",
     host: "0.0.0.0",
@@ -357,14 +438,68 @@ function App() {
     Promise.all([
       window.desktop.store.load(),
       window.desktop.settings.load(),
-    ]).then(([data, globalSettings]) => {
+      window.desktop.app.getVersion(),
+    ]).then(([data, globalSettings, version]) => {
       setStore(data);
       setSettings(globalSettings);
       setSettingsDraft(globalSettings);
+      setAppVersion(version);
       setExpanded(new Set(data.groups.map((g) => g.id)));
       setLoaded(true);
     });
   }, []);
+  useEffect(() => {
+    if (!loaded || !window.desktop) return;
+    let active = true;
+    const off = window.desktop.updates.onStatus((status) => {
+      if (!active) return;
+      setUpdateStatus(status);
+      if (status.phase === "error")
+        setUpdateError(status.message ?? "업데이트 다운로드에 실패했습니다.");
+    });
+    setUpdateStatus({ phase: "checking" });
+    window.desktop.updates
+      .check(false)
+      .then((info) => {
+        if (!active) return;
+        setUpdateInfo(info);
+        setUpdateStatus({ phase: "idle" });
+      })
+      .catch(() => {
+        if (active) setUpdateStatus({ phase: "idle" });
+      });
+    return () => {
+      active = false;
+      off();
+    };
+  }, [loaded]);
+  const checkUpdates = async () => {
+    setUpdateError("");
+    setUpdateStatus({ phase: "checking" });
+    try {
+      const info = await window.desktop!.updates.check(true);
+      setUpdateInfo(info);
+      setUpdateDismissed(false);
+      setUpdateStatus({ phase: "idle" });
+    } catch (error) {
+      setUpdateStatus({ phase: "error" });
+      setUpdateError(
+        error instanceof Error ? error.message : "업데이트 확인에 실패했습니다.",
+      );
+    }
+  };
+  const downloadUpdate = async () => {
+    setUpdateError("");
+    setUpdateStatus({ phase: "downloading", percent: 0 });
+    try {
+      await window.desktop!.updates.download();
+    } catch (error) {
+      setUpdateStatus({ phase: "error" });
+      setUpdateError(
+        error instanceof Error ? error.message : "업데이트 다운로드에 실패했습니다.",
+      );
+    }
+  };
   useEffect(() => {
     if (!dialog) return;
     const close = (event: KeyboardEvent) => {
@@ -940,6 +1075,7 @@ function App() {
               </span>
               <span>UTF-8</span>
               <span>PTY · xterm-256color</span>
+              <span>v{appVersion}</span>
             </footer>
           </>
         ) : (
@@ -950,6 +1086,26 @@ function App() {
           </div>
         )}
       </main>
+      {updateInfo?.updateAvailable && !updateDismissed && (
+        <aside className="update-toast" role="status" aria-label="새 업데이트 알림">
+          <div className="update-toast-icon"><Download /></div>
+          <div>
+            <b>Orbit SSH v{updateInfo.latestVersion}</b>
+            <span>새 버전을 사용할 수 있습니다.</span>
+          </div>
+          <button
+            type="button"
+            className="update-toast-download"
+            onClick={downloadUpdate}
+            disabled={!updateInfo.assetName || updateStatus.phase === "downloading"}
+          >
+            {updateStatus.phase === "downloading" ? `${updateStatus.percent ?? 0}%` : "DMG 받기"}
+          </button>
+          <button type="button" className="update-toast-close" aria-label="업데이트 알림 닫기" onClick={() => setUpdateDismissed(true)}>
+            <X />
+          </button>
+        </aside>
+      )}
       {dialog && (
         <div
           className="modal-backdrop"
@@ -966,7 +1122,20 @@ function App() {
               <X />
             </button>
             {dialog === "settings" ? (
-              <SettingsForm value={settingsDraft} onChange={setSettingsDraft} onSubmit={submitSettings} onCancel={() => setDialog(null)} />
+              <SettingsForm
+                value={settingsDraft}
+                appVersion={appVersion}
+                architecture={window.desktop.architecture}
+                updateInfo={updateInfo}
+                updateStatus={updateStatus}
+                updateError={updateError}
+                onChange={setSettingsDraft}
+                onSubmit={submitSettings}
+                onCancel={() => setDialog(null)}
+                onCheckUpdates={() => void checkUpdates()}
+                onDownloadUpdate={() => void downloadUpdate()}
+                onOpenRelease={() => void window.desktop?.updates.openRelease()}
+              />
             ) : dialog === "group" ? (
               <form onSubmit={submitGroup}>
                 <h2>새 폴더</h2>
