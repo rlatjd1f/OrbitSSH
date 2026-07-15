@@ -43,11 +43,26 @@ Common types:
 Examples:
 
 ```text
-feat(terminal): add four-pane split layout
-fix(shortcuts): forward control-c to the active SSH session
-docs: add setup and usage instructions
+feat(terminal): 4분할 터미널 레이아웃 추가
+fix(shortcuts): 활성 SSH 세션에 Control+C 전달
+docs: 설치 및 사용 방법 추가
 ```
 
 - Keep the subject concise, imperative, and without a trailing period.
 - Use a commit body when the motivation or compatibility impact is not obvious.
 - Mark breaking changes with `!` or a `BREAKING CHANGE:` footer.
+
+## Release Notes Language
+
+- Release notes must explain every change in natural Korean from the user's perspective.
+- Keep the Conventional Commit type and optional scope in English, but write the summary after the colon in Korean.
+- Do not copy raw English commit subjects, internal implementation jargon, or file-level change descriptions into release notes.
+- Explain what changed and how it affects users. Prefer `분할 탭 전환 후 터미널 입력 포커스 자동 복원` over `update focus handler`.
+- If an English commit subject is unavoidable, add a Korean release-note override to the commit body:
+
+```text
+Release-Note-KO: 사용자가 이해할 수 있는 한글 변경 설명
+```
+
+- For an already-pushed historical commit that cannot be amended, add its full commit SHA and Korean explanation to `.github/release-note-overrides.json`.
+- Tag release automation must fail when a commit has neither a Korean summary nor a `Release-Note-KO:` override.

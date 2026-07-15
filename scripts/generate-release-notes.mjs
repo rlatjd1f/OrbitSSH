@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 
 const previousTag = process.argv[2] ?? "";
 const currentTag = process.argv[3];
@@ -9,6 +10,12 @@ if (!currentTag) {
 }
 
 const repository = process.env.GITHUB_REPOSITORY ?? "rlatjd1f/OrbitSSH";
+let summaryOverrides = {};
+try {
+  summaryOverrides = JSON.parse(
+    readFileSync(".github/release-note-overrides.json", "utf8"),
+  );
+} catch {}
 const range = previousTag ? `${previousTag}..${currentTag}` : currentTag;
 const log = execFileSync(
   "git",
@@ -40,7 +47,15 @@ for (const record of log.split("\x1e")) {
   const type = conventional?.[1]?.toLowerCase();
   const scope = conventional?.[2];
   const breaking = Boolean(conventional?.[3]) || /BREAKING CHANGE:/i.test(body);
-  const summary = conventional?.[4] ?? subject;
+  const koreanOverride = body.match(/^Release-Note-KO:\s*(.+)$/im)?.[1]?.trim();
+  const summary =
+    summaryOverrides[hash] ?? koreanOverride ?? conventional?.[4] ?? subject;
+  if (!/[가-힣]/.test(summary)) {
+    console.error(
+      `Commit ${hash.slice(0, 7)} needs a Korean summary or Release-Note-KO override: ${subject}`,
+    );
+    process.exit(1);
+  }
   const key = breaking
     ? "breaking"
     : ["feat", "fix", "perf", "style", "refactor", "docs", "test"].includes(

@@ -69,6 +69,20 @@ npm run dist:mac
 3. 이전 버전 태그부터 현재 태그까지의 커밋을 유형별로 정리한 릴리즈 노트를 생성합니다.
 4. 푸시된 버전 태그를 기준으로 GitHub Release를 생성합니다.
 
+릴리즈 노트의 변경 설명은 사용자 관점의 자연스러운 한글로 작성해야 합니다. Conventional Commit의 타입과 범위는 영문을 유지하되 요약은 한글로 작성합니다.
+
+```text
+feat(terminal): 분할 탭 전환 후 입력 포커스 자동 복원
+```
+
+영문 커밋 제목을 사용해야 한다면 커밋 본문에 한글 설명을 추가합니다.
+
+```text
+Release-Note-KO: 분할된 터미널 사이를 이동할 때 입력 포커스를 자동으로 복원
+```
+
+한글 요약이나 `Release-Note-KO:` 설명이 없는 변경사항이 있으면 릴리즈 작업이 실패합니다.
+
 각 릴리즈에는 다음 네 가지 다운로드 항목만 표시됩니다.
 
 - 소스 코드 ZIP(GitHub 자동 생성)
@@ -86,7 +100,7 @@ git push origin v0.1.0
 버전을 올리고 커밋과 태그를 함께 생성하려면 npm의 버전 명령을 사용할 수 있습니다.
 
 ```bash
-npm version patch -m "chore(release): v%s"
+npm version patch -m "chore(release): 버전 v%s 배포"
 git push origin main --follow-tags
 ```
 
