@@ -1,0 +1,81 @@
+name: Build and Release
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: orbit-ssh-release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build macOS ${{ matrix.arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-latest
+            arch: arm64
+          - runner: macos-15-intel
+            arch: x64
+    runs-on: ${{ matrix.runner }}
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build application
+        run: npm run build
+
+      - name: Package macOS application
+        run: npx electron-builder --mac dmg zip --${{ matrix.arch }} --publish never
+
+      - name: Upload installers
+        uses: actions/upload-artifact@v4
+        with:
+          name: OrbitSSH-${{ matrix.arch }}
+          path: |
+            release/*.dmg
+            release/*.zip
+          if-no-files-found: error
+
+  release:
+    name: Create GitHub prerelease
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download installers
+        uses: actions/download-artifact@v4
+        with:
+          path: release
+          merge-multiple: true
+
+      - name: Create or update development release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="build-${GITHUB_RUN_NUMBER}"
+          TITLE="Orbit SSH Build #${GITHUB_RUN_NUMBER}"
+          NOTES="Automated development build for commit ${GITHUB_SHA}. These macOS packages are unsigned prerelease artifacts."
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$TAG" release/* --clobber --repo "$GITHUB_REPOSITORY"
+            gh release edit "$TAG" --title "$TITLE" --notes "$NOTES" --prerelease --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create "$TAG" release/* --target "$GITHUB_SHA" --title "$TITLE" --notes "$NOTES" --prerelease --repo "$GITHUB_REPOSITORY"
+          fi

@@ -550,6 +550,16 @@ app.whenReady().then(() => {
     createWindow();
     mainWindow.webContents.once("did-finish-load", async () => {
       try {
+        await mainWindow.webContents.executeJavaScript(`new Promise((resolve,reject)=>{
+          const started=Date.now();
+          const ready=()=>{
+            if(document.querySelector('.app-shell')) return resolve(true);
+            if(Date.now()-started>5000) return reject(new Error('UI mount timeout'));
+            setTimeout(ready,25);
+          };
+          ready();
+        })`);
+        await new Promise((resolve) => setTimeout(resolve, 100));
         const settingsModifier =
           process.platform === "darwin" ? "meta" : "control";
         mainWindow.webContents.sendInputEvent({

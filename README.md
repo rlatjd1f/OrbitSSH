@@ -54,6 +54,24 @@ node-pty의 Electron 네이티브 모듈을 다시 빌드해야 하는 경우에
 npm run rebuild:native
 ```
 
+macOS 설치 파일을 로컬에서 생성하려면 다음 명령을 사용합니다. 생성된 DMG와 ZIP 파일은 `release/`에 저장됩니다.
+
+```bash
+npm run dist:mac
+```
+
+## 자동 릴리즈
+
+`main` 브랜치에 커밋이 푸시될 때마다 GitHub Actions가 다음 작업을 수행합니다.
+
+1. ARM64 및 Intel x64 macOS 러너에서 애플리케이션을 각각 빌드합니다.
+2. 각 아키텍처용 DMG와 ZIP 파일을 생성합니다.
+3. `build-<실행 번호>` 태그와 함께 GitHub prerelease를 생성합니다.
+
+워크플로는 GitHub의 **Actions → Build and Release → Run workflow**에서도 수동으로 실행할 수 있습니다.
+
+현재 자동 빌드에는 Apple Developer ID 코드 서명과 공증이 적용되지 않습니다. 따라서 다운로드한 앱을 처음 실행할 때 macOS Gatekeeper 경고가 표시될 수 있습니다.
+
 ## SSH 연결 등록
 
 1. 왼쪽 사이드바에서 **새 폴더**를 눌러 서버를 분류할 폴더를 만듭니다.
