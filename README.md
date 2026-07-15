@@ -62,13 +62,25 @@ npm run dist:mac
 
 ## 자동 릴리즈
 
-`main` 브랜치에 커밋이 푸시될 때마다 GitHub Actions가 다음 작업을 수행합니다.
+`v`로 시작하는 버전 태그가 원격에 푸시될 때만 GitHub Actions가 다음 작업을 수행합니다. 일반 브랜치 커밋이나 `main` 푸시만으로는 릴리즈가 생성되지 않습니다.
 
 1. ARM64 및 Intel x64 macOS 러너에서 애플리케이션을 각각 빌드합니다.
 2. 각 아키텍처용 DMG와 ZIP 파일을 생성합니다.
-3. `build-<실행 번호>` 태그와 함께 GitHub prerelease를 생성합니다.
+3. 푸시된 버전 태그를 기준으로 GitHub Release를 생성합니다.
 
-워크플로는 GitHub의 **Actions → Build and Release → Run workflow**에서도 수동으로 실행할 수 있습니다.
+태그는 `package.json`의 버전과 일치해야 합니다. 예를 들어 버전이 `0.1.0`이면 다음과 같이 릴리즈합니다.
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+버전을 올리고 커밋과 태그를 함께 생성하려면 npm의 버전 명령을 사용할 수 있습니다.
+
+```bash
+npm version patch
+git push origin main --follow-tags
+```
 
 현재 자동 빌드에는 Apple Developer ID 코드 서명과 공증이 적용되지 않습니다. 따라서 다운로드한 앱을 처음 실행할 때 macOS Gatekeeper 경고가 표시될 수 있습니다.
 
