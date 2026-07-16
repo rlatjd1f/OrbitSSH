@@ -47,6 +47,19 @@ type UpdateStatus = {
   opened?: boolean;
   message?: string;
 };
+type SessionExportResult = {
+  canceled: boolean;
+  path?: string;
+  groupCount?: number;
+  hostCount?: number;
+};
+type SessionImportResult = {
+  canceled: boolean;
+  path?: string;
+  store?: ConnectionStore;
+  importedGroupCount?: number;
+  importedHostCount?: number;
+};
 
 interface Window {
   desktop?: {
@@ -69,6 +82,8 @@ interface Window {
     store: {
       load(): Promise<ConnectionStore>;
       save(data: ConnectionStore): Promise<ConnectionStore>;
+      export(): Promise<SessionExportResult>;
+      import(): Promise<SessionImportResult>;
     };
     settings: {
       load(): Promise<AppSettings>;
@@ -111,6 +126,8 @@ interface Window {
           | "split-tab"
           | "open-settings"
           | "check-updates"
+          | "export-sessions"
+          | "import-sessions"
           | "copy-selection",
       ) => void,
     ): () => void;

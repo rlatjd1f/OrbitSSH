@@ -1,6 +1,7 @@
 const {
   app,
   BrowserWindow,
+  dialog,
   globalShortcut,
   ipcMain,
   Menu,
@@ -499,6 +500,163 @@ function saveStore(data) {
   return clean;
 }
 
+function exportableStore() {
+  const store = loadStore();
+  return {
+    app: "OrbitSSH",
+    type: "orbit-ssh-sessions",
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    note: mainText(
+      "비밀번호는 macOS Keychain에 저장되므로 이 파일에 포함되지 않습니다.",
+      "Passwords are stored in macOS Keychain and are not included in this file.",
+    ),
+    groups: store.groups.map(({ id, name, parentId = null }) => ({
+      id,
+      name,
+      parentId,
+    })),
+    hosts: store.hosts.map(
+      ({ id, name, host, user, port, groupId, authType, identityFile }) => ({
+        id,
+        name,
+        host,
+        user,
+        port,
+        groupId,
+        authType,
+        identityFile,
+      }),
+    ),
+  };
+}
+
+function uniqueName(baseName, usedNames) {
+  const base = String(baseName ?? "").trim() || "Imported";
+  if (!usedNames.has(base)) {
+    usedNames.add(base);
+    return base;
+  }
+  let index = 1;
+  let next = `${base} (${index})`;
+  while (usedNames.has(next)) {
+    index += 1;
+    next = `${base} (${index})`;
+  }
+  usedNames.add(next);
+  return next;
+}
+
+function mergeImportedStore(current, imported) {
+  const importedGroups = Array.isArray(imported?.groups) ? imported.groups : [];
+  const importedHosts = Array.isArray(imported?.hosts) ? imported.hosts : [];
+  if (!importedGroups.length && !importedHosts.length)
+    throw new Error(
+      mainText(
+        "가져올 세션 정보가 없습니다.",
+        "There is no session information to import.",
+      ),
+    );
+
+  const currentGroups = current.groups.length
+    ? current.groups
+    : structuredClone(defaults.groups);
+  const groupIdMap = new Map();
+  const usedGroupNames = new Set(currentGroups.map((group) => group.name));
+  const importedGroupIds = new Set();
+  const nextGroups = [...currentGroups];
+
+  for (const group of importedGroups) {
+    const originalId = String(group?.id ?? crypto.randomUUID());
+    importedGroupIds.add(originalId);
+    const nextId = crypto.randomUUID();
+    groupIdMap.set(originalId, nextId);
+    nextGroups.push({
+      id: nextId,
+      name: uniqueName(group?.name, usedGroupNames),
+      parentId: null,
+    });
+  }
+  for (const group of importedGroups) {
+    const originalId = String(group?.id ?? "");
+    const nextId = groupIdMap.get(originalId);
+    if (!nextId) continue;
+    const nextGroup = nextGroups.find((item) => item.id === nextId);
+    if (!nextGroup) continue;
+    const originalParentId =
+      group?.parentId === null || group?.parentId === undefined
+        ? null
+        : String(group.parentId);
+    nextGroup.parentId = originalParentId
+      ? groupIdMap.get(originalParentId) ?? null
+      : null;
+  }
+
+  const fallbackGroupId = currentGroups[0]?.id ?? defaults.groups[0].id;
+  const usedHostNames = new Set(current.hosts.map((host) => host.name));
+  const nextHosts = [...current.hosts];
+  for (const host of importedHosts) {
+    const importedGroupId = String(host?.groupId ?? "");
+    const targetGroupId =
+      groupIdMap.get(importedGroupId) ??
+      (importedGroupIds.has(importedGroupId) ? fallbackGroupId : fallbackGroupId);
+    nextHosts.push({
+      id: crypto.randomUUID(),
+      name: uniqueName(host?.name, usedHostNames),
+      host: String(host?.host ?? "").trim(),
+      user: String(host?.user ?? "").trim(),
+      port: clamp(host?.port, 1, 65535, 22),
+      groupId: targetGroupId,
+      authType: host?.authType === "password" ? "password" : "key",
+      identityFile: String(host?.identityFile ?? "").trim(),
+    });
+  }
+  return {
+    groups: nextGroups,
+    hosts: nextHosts,
+  };
+}
+
+async function exportSessionsToFile() {
+  const result = await dialog.showSaveDialog(mainWindow, {
+    title: mainText("세션 정보 내보내기", "Export session information"),
+    defaultPath: `OrbitSSH-sessions-${new Date().toISOString().slice(0, 10)}.json`,
+    filters: [{ name: "JSON", extensions: ["json"] }],
+  });
+  if (result.canceled || !result.filePath) return { canceled: true };
+  const data = exportableStore();
+  fs.writeFileSync(result.filePath, JSON.stringify(data, null, 2), {
+    mode: 0o600,
+  });
+  return {
+    canceled: false,
+    path: result.filePath,
+    groupCount: data.groups.length,
+    hostCount: data.hosts.length,
+  };
+}
+
+async function importSessionsFromFile() {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: mainText("세션 정보 가져오기", "Import session information"),
+    properties: ["openFile"],
+    filters: [{ name: "JSON", extensions: ["json"] }],
+  });
+  if (result.canceled || !result.filePaths?.[0]) return { canceled: true };
+  const filePath = result.filePaths[0];
+  const parsed = JSON.parse(fs.readFileSync(filePath, "utf8"));
+  const current = loadStore();
+  const merged = mergeImportedStore(current, parsed);
+  const saved = saveStore(merged);
+  return {
+    canceled: false,
+    path: filePath,
+    store: saved,
+    importedGroupCount: Math.max(0, saved.groups.length - current.groups.length),
+    importedHostCount: Math.max(0, saved.hosts.length - current.hosts.length),
+  };
+}
+
 function send(channel, payload) {
   if (mainWindow && !mainWindow.isDestroyed())
     mainWindow.webContents.send(channel, payload);
@@ -751,6 +909,8 @@ function registerIpc() {
   });
   ipcMain.handle("store:load", () => loadStore());
   ipcMain.handle("store:save", (_event, data) => saveStore(data));
+  ipcMain.handle("store:export", () => exportSessionsToFile());
+  ipcMain.handle("store:import", () => importSessionsFromFile());
   ipcMain.handle("settings:load", () => loadSettings());
   ipcMain.handle("settings:save", (_event, value) => {
     const saved = saveSettings(value);
@@ -944,6 +1104,9 @@ function installApplicationMenu(language = loadSettings().language) {
         hideOthers: "다른 항목 가리기",
         showAll: "모두 보기",
         quit: `${appMenuName} 종료`,
+        file: "파일",
+        importSessions: "세션 정보 가져오기…",
+        exportSessions: "세션 정보 내보내기…",
         terminal: "터미널",
         interrupt: "작업 중단",
         showLog: "단축키 디버그 로그 보기",
@@ -965,6 +1128,9 @@ function installApplicationMenu(language = loadSettings().language) {
         hideOthers: "Hide Others",
         showAll: "Show All",
         quit: `Quit ${appMenuName}`,
+        file: "File",
+        importSessions: "Import Session Information…",
+        exportSessions: "Export Session Information…",
         terminal: "Terminal",
         interrupt: "Interrupt",
         showLog: "Show Shortcut Debug Log",
@@ -1004,6 +1170,19 @@ function installApplicationMenu(language = loadSettings().language) {
           },
         ]
       : []),
+    {
+      label: menuText.file,
+      submenu: [
+        {
+          label: menuText.importSessions,
+          click: () => send("shortcut:action", "import-sessions"),
+        },
+        {
+          label: menuText.exportSessions,
+          click: () => send("shortcut:action", "export-sessions"),
+        },
+      ],
+    },
     {
       label: menuText.terminal,
       submenu: [
@@ -1338,6 +1517,9 @@ app.whenReady().then(() => {
         result.englishMenu =
           englishMenuLabels?.includes(appMenuName) &&
           englishMenuLabels?.includes(`About ${appMenuName}`) &&
+          englishMenuLabels?.includes("File") &&
+          englishMenuLabels?.includes("Import Session Information…") &&
+          englishMenuLabels?.includes("Export Session Information…") &&
           englishMenuLabels?.includes("Terminal") &&
           englishMenuLabels?.includes("Edit") &&
           englishMenuLabels?.includes("Window") &&
@@ -1352,6 +1534,9 @@ app.whenReady().then(() => {
         result.koreanMenu =
           koreanMenuLabels?.includes(appMenuName) &&
           koreanMenuLabels?.includes(`${appMenuName} 정보`) &&
+          koreanMenuLabels?.includes("파일") &&
+          koreanMenuLabels?.includes("세션 정보 가져오기…") &&
+          koreanMenuLabels?.includes("세션 정보 내보내기…") &&
           koreanMenuLabels?.includes("터미널") &&
           koreanMenuLabels?.includes("편집") &&
           koreanMenuLabels?.includes("윈도우") &&

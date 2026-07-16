@@ -20,6 +20,8 @@ contextBridge.exposeInMainWorld("desktop", {
   store: {
     load: () => ipcRenderer.invoke("store:load"),
     save: (data) => ipcRenderer.invoke("store:save", data),
+    export: () => ipcRenderer.invoke("store:export"),
+    import: () => ipcRenderer.invoke("store:import"),
   },
   settings: {
     load: () => ipcRenderer.invoke("settings:load"),

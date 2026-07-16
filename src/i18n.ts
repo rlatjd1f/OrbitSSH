@@ -75,6 +75,12 @@ const messages = {
     noServersToOpen: "열 수 있는 서버가 없습니다.",
     connections: "연결",
     noConnections: "등록된 서버가 없습니다.",
+    exportSessionsDone:
+      "세션 정보를 내보냈습니다. 폴더 {groupCount}개, 서버 {hostCount}개가 포함되었습니다.",
+    exportSessionsFailed: "세션 정보 내보내기에 실패했습니다.",
+    importSessionsDone:
+      "세션 정보를 가져왔습니다. 폴더 {groupCount}개, 서버 {hostCount}개가 추가되었습니다.",
+    importSessionsFailed: "세션 정보 가져오기에 실패했습니다.",
     deleteFolder: "폴더 삭제",
     edit: "수정",
     delete: "삭제",
@@ -196,6 +202,12 @@ const messages = {
     noServersToOpen: "There are no servers to open.",
     connections: "Connections",
     noConnections: "No servers have been added.",
+    exportSessionsDone:
+      "Session information was exported. It includes {groupCount} folders and {hostCount} servers.",
+    exportSessionsFailed: "Failed to export session information.",
+    importSessionsDone:
+      "Session information was imported. {groupCount} folders and {hostCount} servers were added.",
+    importSessionsFailed: "Failed to import session information.",
     deleteFolder: "Delete folder",
     edit: "Edit",
     delete: "Delete",

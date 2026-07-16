@@ -989,6 +989,44 @@ function App() {
     setStore(saved);
     return saved;
   };
+  const exportSessions = async () => {
+    try {
+      const result = await window.desktop!.store.export();
+      if (result.canceled) return;
+      alert(
+        t("exportSessionsDone", {
+          groupCount: result.groupCount ?? 0,
+          hostCount: result.hostCount ?? 0,
+        }),
+      );
+    } catch (error) {
+      alert(
+        `${t("exportSessionsFailed")}\n${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+  };
+  const importSessions = async () => {
+    try {
+      const result = await window.desktop!.store.import();
+      if (result.canceled || !result.store) return;
+      setStore(result.store);
+      setExpanded(new Set(result.store.groups.map((group) => group.id)));
+      alert(
+        t("importSessionsDone", {
+          groupCount: result.importedGroupCount ?? 0,
+          hostCount: result.importedHostCount ?? 0,
+        }),
+      );
+    } catch (error) {
+      alert(
+        `${t("importSessionsFailed")}\n${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+  };
   const openSettings = () => {
     setSettingsDraft(settings);
     setDialog("settings");
@@ -1338,6 +1376,14 @@ function App() {
         if (action === "check-updates") {
           setDialog("update-check");
           void checkUpdates();
+          return;
+        }
+        if (action === "export-sessions") {
+          void exportSessions();
+          return;
+        }
+        if (action === "import-sessions") {
+          void importSessions();
           return;
         }
         if (action === "copy-selection") {
