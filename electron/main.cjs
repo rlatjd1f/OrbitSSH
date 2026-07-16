@@ -1062,9 +1062,21 @@ app.whenReady().then(() => {
           const terminalTabs=[...document.querySelectorAll('.tabs button')].filter(el=>el.textContent.includes('test-host'));
           const duplicateTabsOpened=terminalTabs.length===2;
           const activeBefore=terminalTabs.findIndex(el=>el.classList.contains('active'));
+          const nav=document.querySelector('.sidebar nav');
+          nav.focus(); await wait(30);
+          nav.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowDown',bubbles:true})); await wait(80);
+          const sidebarMovedDown=document.querySelector('[data-sidebar-host-id="alpha-box"]')?.classList.contains('selected')&&document.activeElement?.dataset.sidebarHostId==='alpha-box';
+          nav.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowUp',bubbles:true})); await wait(80);
+          const sidebarMovedUp=document.querySelector('[data-sidebar-host-id="test-host"]')?.classList.contains('selected')&&document.activeElement?.dataset.sidebarHostId==='test-host';
+          const groupStyle=getComputedStyle(document.querySelector('.group-wrap'));
+          const hostStyle=getComputedStyle(document.querySelector('.host-wrap'));
+          const hostNameStyle=getComputedStyle(document.querySelector('.host-title .host-name'));
+          const hostMetaStyle=getComputedStyle(document.querySelector('.host-title small'));
+          const sidebarTreeStyled=groupStyle.backgroundColor!==hostStyle.backgroundColor&&hostNameStyle.color!==hostMetaStyle.color&&document.querySelector('.host-wrap')?.classList.length>=1;
+          terminalTabs[activeBefore]?.click(); await wait(80);
           window.__preservedPane=document.querySelector('.terminal-pane.focused');
           window.__preservedText=window.__preservedPane?.textContent??'';
-          return {folderOpened,modalBackdropClear,escapeClosed,passwordVisible,keyVisible,equipmentNameBlank,hostDefaultsToAny,userBlank,placeholderIsGray,equipmentLabel,duplicateTabsOpened,activeBefore};
+          return {folderOpened,modalBackdropClear,escapeClosed,passwordVisible,keyVisible,equipmentNameBlank,hostDefaultsToAny,userBlank,placeholderIsGray,equipmentLabel,duplicateTabsOpened,activeBefore,sidebarMovedDown,sidebarMovedUp,sidebarTreeStyled};
         })()`);
         result.settingsShortcut =
           settingsCheck.settingsOpened && settingsCheck.settingsClosed;
@@ -1603,6 +1615,9 @@ app.whenReady().then(() => {
           result.heldCtrlCRepeated &&
           result.tabContentPreserved &&
           result.folderOpened &&
+          result.sidebarMovedDown &&
+          result.sidebarMovedUp &&
+          result.sidebarTreeStyled &&
           result.modalBackdropClear &&
           result.escapeClosed &&
           result.passwordVisible &&

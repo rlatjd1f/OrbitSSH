@@ -912,6 +912,36 @@ function App() {
         .filter((g) => !query || g.hosts.length),
     [store, query],
   );
+  const visibleSidebarHosts = groups.flatMap((group) =>
+    expanded.has(group.id) || Boolean(query) ? group.hosts : [],
+  );
+  const moveSidebarHostSelection = (direction: -1 | 1) => {
+    if (!visibleSidebarHosts.length) return;
+    const index = visibleSidebarHosts.findIndex(
+      (host) => host.id === selectedHostId,
+    );
+    const next =
+      visibleSidebarHosts[
+        (index + direction + visibleSidebarHosts.length) %
+          visibleSidebarHosts.length
+      ];
+    setSelectedHostId(next.id);
+    setActiveTabId("");
+  };
+  const focusSelectedSidebarHost = () => {
+    if (!selectedHostId) return;
+    requestAnimationFrame(() => {
+      if (!document.activeElement?.closest(".sidebar nav")) return;
+      const element = document.querySelector<HTMLButtonElement>(
+        `[data-sidebar-host-id="${CSS.escape(selectedHostId)}"]`,
+      );
+      element?.focus();
+      element?.scrollIntoView({ block: "nearest" });
+    });
+  };
+  useEffect(() => {
+    focusSelectedSidebarHost();
+  }, [selectedHostId, query, expanded]);
   if (!window.desktop)
     return (
       <div className="fatal">
@@ -984,7 +1014,36 @@ function App() {
             </button>
           </div>
         </div>
-        <nav>
+        <nav
+          tabIndex={0}
+          aria-label={t("connections")}
+          onFocus={(event) => {
+            if (event.target !== event.currentTarget) return;
+            if (!selectedHostId && visibleSidebarHosts[0])
+              setSelectedHostId(visibleSidebarHosts[0].id);
+            else focusSelectedSidebarHost();
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "ArrowDown" || event.key === "Down") {
+              event.preventDefault();
+              moveSidebarHostSelection(1);
+              return;
+            }
+            if (event.key === "ArrowUp" || event.key === "Up") {
+              event.preventDefault();
+              moveSidebarHostSelection(-1);
+              return;
+            }
+            if (event.key === "Enter") {
+              const host = visibleSidebarHosts.find(
+                (item) => item.id === selectedHostId,
+              );
+              if (!host) return;
+              event.preventDefault();
+              void connect(host);
+            }
+          }}
+        >
           {loaded && groups.length === 0 && (
             <p className="no-connections">{t("noConnections")}</p>
           )}
@@ -1025,6 +1084,7 @@ function App() {
                     <div className="host-wrap" key={h.id}>
                       <button
                         className={`tree-row host-row ${selectedHostId === h.id ? "selected" : ""}`}
+                        data-sidebar-host-id={h.id}
                         onDoubleClick={() => connect(h)}
                         onClick={() => {
                           setSelectedHostId(h.id);
@@ -1034,7 +1094,7 @@ function App() {
                         <span className={`status ${ss?.state ?? "idle"}`} />
                         <Server />
                         <span className="host-title">
-                          <b>{h.name}</b>
+                          <b className="host-name">{h.name}</b>
                           <small>
                             {h.user}@{h.host}:{h.port}
                           </small>

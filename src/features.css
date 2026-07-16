@@ -1,9 +1,65 @@
+.tree-group {
+  margin: 0 8px 6px;
+  border: 1px solid #252a35;
+  border-radius: 8px;
+  background: #0d1016;
+  overflow: hidden;
+}
+.group-wrap {
+  background: #151922;
+  border-bottom: 1px solid #242a35;
+}
+.tree-group:has(.host-wrap) .group-wrap {
+  border-bottom-color: #2b3140;
+}
+.folder-row {
+  color: #d7dbe5;
+}
+.folder-row .count {
+  min-width: 22px;
+  margin-right: 10px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: #232936;
+  color: #aeb6c6;
+  text-align: center;
+}
+.host-wrap {
+  background: #10141b;
+}
+.host-wrap::before {
+  content: "";
+  position: absolute;
+  left: 21px;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: #2b3240;
+}
+.host-wrap .host-row {
+  border-left: 2px solid transparent;
+}
+.host-row:focus-visible {
+  outline: 0;
+  box-shadow: inset 0 0 0 1px #7d70f0;
+}
+.host-row.selected {
+  border-left-color: #8a7cf0;
+}
+.host-title .host-name {
+  color: #eef1f7;
+  font-weight: 700;
+}
+.host-title small {
+  color: #8bb4d9;
+  font-weight: 600;
+}
 .group-wrap,
 .host-wrap {
   position: relative;
 }
 .group-wrap .folder-row {
-  padding-left: 12px;
+  padding-left: 10px;
 }
 .delete-group,
 .host-actions button {
@@ -31,7 +87,7 @@
   opacity: 0;
 }
 .host-wrap .host-row {
-  padding-left: 34px;
+  padding-left: 36px;
   padding-right: 58px;
 }
 .host-actions {
