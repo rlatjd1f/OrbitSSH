@@ -2,7 +2,7 @@
   "name": "orbit-ssh",
   "productName": "Orbit SSH",
   "private": true,
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "A customizable desktop SSH manager with tabbed terminals and split panes.",
   "author": "rlatjd1f",
   "repository": "https://github.com/rlatjd1f/OrbitSSH.git",
