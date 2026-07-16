@@ -1864,18 +1864,17 @@ function App() {
               </div>
             )}
           </div>
-          <button
-            type="button"
-            className="update-toast-download"
-            onClick={downloadUpdate}
-            disabled={
-              !updateInfo.assetName ||
-              updateStatus.phase === "downloading" ||
-              updateStatus.phase === "installing"
-            }
-          >
-            {updateToastAction}
-          </button>
+          {updateStatus.phase !== "downloading" &&
+            updateStatus.phase !== "installing" && (
+              <button
+                type="button"
+                className="update-toast-download"
+                onClick={downloadUpdate}
+                disabled={!updateInfo.assetName}
+              >
+                {updateToastAction}
+              </button>
+            )}
           <button type="button" className="update-toast-close" aria-label={t("dismissUpdate")} onClick={() => setUpdateDismissed(true)}>
             <X />
           </button>
