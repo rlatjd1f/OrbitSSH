@@ -1675,7 +1675,11 @@ function App() {
           <div className="update-toast-icon"><Download /></div>
           <div>
             <b>Orbit SSH v{updateInfo.latestVersion}</b>
-            <span>{t("newVersionAvailable")}</span>
+            <span>
+              {updateStatus.phase === "downloading"
+                ? t("updateDownloadInProgress")
+                : t("newVersionAvailable")}
+            </span>
           </div>
           <button
             type="button"
@@ -1683,7 +1687,9 @@ function App() {
             onClick={downloadUpdate}
             disabled={!updateInfo.assetName || updateStatus.phase === "downloading"}
           >
-            {updateStatus.phase === "downloading" ? `${updateStatus.percent ?? 0}%` : t("downloadDmg")}
+            {updateStatus.phase === "downloading"
+              ? t("downloadingUpdate")
+              : t("downloadDmg")}
           </button>
           <button type="button" className="update-toast-close" aria-label={t("dismissUpdate")} onClick={() => setUpdateDismissed(true)}>
             <X />
