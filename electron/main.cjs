@@ -1105,6 +1105,33 @@ app.whenReady().then(() => {
         result.settingsLabelsLarger =
           settingsCheck.labelFontSize >= 12 &&
           settingsCheck.sectionFontSize >= 13;
+        result.labelsMeetMinimumFontSize =
+          await mainWindow.webContents.executeJavaScript(`(()=>{
+            const selectors=[
+              '.sidebar header p',
+              '.section-title span',
+              '.search kbd',
+              '.count',
+              '.host-title small',
+              '.session-bar p',
+              '.connection-state',
+              '.modal label',
+              '.modal label span',
+              '.auth-options legend',
+              '.auth-options small',
+              '.session-picker-list h3',
+              '.pane-bar b',
+              '.pane-bar small',
+              '.workspace footer',
+              '.settings-modal .settings-grid > label:not(.setting-toggle) > span',
+              '.setting-toggle small',
+              '.update-card small',
+              '.update-result small',
+              '.update-toast span'
+            ];
+            const failures=selectors.flatMap(selector=>[...document.querySelectorAll(selector)].slice(0,2).map(el=>({selector,size:parseFloat(getComputedStyle(el).fontSize)})).filter(item=>item.size<11));
+            return {passed:failures.length===0,failures};
+          })()`);
         result.footerReadable = await mainWindow.webContents.executeJavaScript(
           `(()=>{const footer=document.querySelector('.workspace footer');if(!footer)return false;const style=getComputedStyle(footer);return parseFloat(style.fontSize)>=10&&style.color!=='rgb(97, 104, 119)'&&style.backgroundColor!=='rgb(18, 21, 27)'})()`,
         );
@@ -1565,6 +1592,7 @@ app.whenReady().then(() => {
           result.fontComboHasTenOptions &&
           result.settingsSelectReadable &&
           result.settingsLabelsLarger &&
+          result.labelsMeetMinimumFontSize.passed &&
           result.footerReadable &&
           result.resizeFailureHandled &&
           result.darkThemeContrastReadable.passed &&

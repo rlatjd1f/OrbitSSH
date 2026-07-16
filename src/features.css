@@ -78,8 +78,8 @@
   margin-left: auto;
   border: 1px solid #35404b;
   border-radius: 5px;
-  padding: 5px 8px;
-  font-size: 8px;
+  padding: 6px 9px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.7px;
 }
@@ -196,7 +196,7 @@
   display: flex;
   flex-direction: column;
   gap: 7px;
-  font-size: 10px;
+  font-size: 11px;
   color: #858c9b;
   margin: 13px 0;
   font-weight: 600;
@@ -304,7 +304,7 @@
   margin: 15px 0;
 }
 .auth-options legend {
-  font-size: 10px;
+  font-size: 11px;
   color: #858c9b;
   font-weight: 600;
   margin-bottom: 8px;
@@ -356,7 +356,7 @@
   color: #d9dce5;
 }
 .auth-options small {
-  font-size: 10px;
+  font-size: 11px;
   color: #8d95a6;
   font-weight: 400;
 }
@@ -390,7 +390,7 @@
 }
 .session-picker-list h3 {
   margin: 0 0 2px;
-  font-size: 10px;
+  font-size: 11px;
   color: #747c8d;
   letter-spacing: 0.7px;
   text-transform: uppercase;
@@ -501,7 +501,7 @@
   color: #858c99;
 }
 .pane-bar b {
-  font-size: 10px;
+  font-size: 11px;
   color: #c8ccd5;
   font-weight: 500;
 }
@@ -510,7 +510,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font: 10px "JetBrains Mono";
+  font: 11px "JetBrains Mono";
   color: #8d95a6;
 }
 .pane-bar button {
@@ -555,7 +555,7 @@
   background: #161a22;
   border-top-color: #323846;
   color: #a7afbf;
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.2px;
 }
@@ -597,7 +597,7 @@
   color: #aeb4c2;
 }
 .settings-modal .settings-grid > label:not(.setting-toggle) > span {
-  font-size: 10px;
+  font-size: 11px;
   color: #8d95a6;
 }
 .settings-modal .settings-grid input,
@@ -627,7 +627,7 @@
 }
 .setting-toggle small {
   color: #8d95a6;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 400;
 }
 .settings-grid .setting-toggle input {
@@ -665,7 +665,7 @@
 .update-card small,
 .update-result small {
   color: #858d9c;
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1.4;
 }
 .update-card button,
@@ -781,7 +781,7 @@
 }
 .update-toast span {
   color: #959caa;
-  font-size: 10px;
+  font-size: 11px;
 }
 .update-toast button {
   border: 0;
