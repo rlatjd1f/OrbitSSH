@@ -23,6 +23,7 @@ let terminalInterruptCount = 0;
 let inputSourceSwitchCount = 0;
 let inputSourceSwitchSuccessCount = 0;
 let activeTerminalSessionId = null;
+let modalOpen = false;
 let physicalControlDown = false;
 let lastPhysicalControlUpAt = 0;
 let remappedControlCActive = false;
@@ -783,7 +784,9 @@ function registerTerminalShortcut() {
   const registered = globalShortcut.register("Control+C", () => {
     logShortcut("global-shortcut:invoked", {
       focused: Boolean(mainWindow?.isFocused()),
+      modalOpen,
     });
+    if (modalOpen) return;
     interruptActiveTerminal();
   });
   logShortcut("global-shortcut:registered", { registered });
@@ -938,6 +941,15 @@ function registerIpc() {
   ipcMain.on("shortcut:renderer-log", (_event, { event, details }) => {
     logShortcut(`renderer:${event}`, details);
   });
+  ipcMain.on("ui:modal-open", (_event, value) => {
+    modalOpen = Boolean(value);
+    logShortcut("ui:modal-open", { modalOpen });
+    if (modalOpen) {
+      physicalControlDown = false;
+      lastPhysicalControlUpAt = 0;
+      remappedControlCActive = false;
+    }
+  });
   ipcMain.handle("terminal:close", (_event, sessionId) => {
     closeTerminal(sessionId);
   });
@@ -1016,7 +1028,13 @@ function createWindow() {
         effectiveControl: controlPressed,
         remappedControlShortcut,
         activeSessionId: activeTerminalSessionId,
+        modalOpen,
       });
+    if (modalOpen) {
+      if (key === "c" && input.type === "keyUp")
+        remappedControlCActive = false;
+      return;
+    }
     if (key === "w" && (input.meta || input.control)) {
       event.preventDefault();
       mainWindow.webContents.send("shortcut:action", "close-tab");
@@ -1504,6 +1522,55 @@ app.whenReady().then(() => {
           window.__preservedText=window.__preservedPane?.textContent??'';
           return {folderOpened,modalBackdropClear,escapeClosed,passwordVisible,keyVisible,equipmentNameBlank,hostDefaultsToAny,userBlank,placeholderIsGray,equipmentLabel,duplicateTabsOpened,activeBefore,sidebarMovedDown,sidebarMovedUp,sidebarTreeStyled,contextMenuOpened,duplicateSessionCreated,duplicatedHostDeleted,sidebarDeleteKeyDeleted};
         })()`);
+        const modalShortcutPaneCountBefore =
+          await mainWindow.webContents.executeJavaScript(
+            `document.querySelectorAll('.terminal-pane:not(.cached)').length`,
+          );
+        const modalShortcutInterruptsBefore = terminalInterruptCount;
+        await mainWindow.webContents.executeJavaScript(
+          `document.querySelector('[data-testid="new-connection"]')?.click()`,
+        );
+        await new Promise((resolve) => setTimeout(resolve, 120));
+        mainWindow.webContents.sendInputEvent({
+          type: "keyDown",
+          keyCode: "D",
+          modifiers: ["meta"],
+        });
+        mainWindow.webContents.sendInputEvent({
+          type: "keyUp",
+          keyCode: "D",
+          modifiers: ["meta"],
+        });
+        mainWindow.webContents.sendInputEvent({
+          type: "keyDown",
+          keyCode: "C",
+          modifiers: ["control"],
+        });
+        mainWindow.webContents.sendInputEvent({
+          type: "keyUp",
+          keyCode: "C",
+          modifiers: ["control"],
+        });
+        await new Promise((resolve) => setTimeout(resolve, 160));
+        const modalShortcutCheck = await mainWindow.webContents.executeJavaScript(
+          `({
+            modalOpen: Boolean(document.querySelector('.modal')),
+            paneCount: document.querySelectorAll('.terminal-pane:not(.cached)').length
+          })`,
+        );
+        mainWindow.webContents.sendInputEvent({
+          type: "keyDown",
+          keyCode: "Escape",
+        });
+        mainWindow.webContents.sendInputEvent({
+          type: "keyUp",
+          keyCode: "Escape",
+        });
+        await new Promise((resolve) => setTimeout(resolve, 80));
+        result.modalShortcutsSuppressed =
+          modalShortcutCheck.modalOpen &&
+          modalShortcutCheck.paneCount === modalShortcutPaneCountBefore &&
+          terminalInterruptCount === modalShortcutInterruptsBefore;
         result.settingsShortcut =
           settingsCheck.settingsOpened && settingsCheck.settingsClosed;
         result.sidebarToggle = sidebarToggleCheck;
@@ -2044,6 +2111,7 @@ app.whenReady().then(() => {
           result.koreanLanguageRestored &&
           result.koreanMenu &&
           result.updateCheckDialog &&
+          result.modalShortcutsSuppressed &&
           result.appVersionVisible &&
           result.updateAvailableVisible &&
           result.settingsEscapeClosed &&

@@ -949,6 +949,10 @@ function App() {
         ? `${t("downloadingUpdate")} ${toastDownloadPercent}%`
         : t("downloadDmg");
   useEffect(() => {
+    window.desktop?.ui.setModalOpen(Boolean(dialog));
+    return () => window.desktop?.ui.setModalOpen(false);
+  }, [dialog]);
+  useEffect(() => {
     if (!dialog) return;
     const close = (event: KeyboardEvent) => {
       if (event.key === "Escape") {

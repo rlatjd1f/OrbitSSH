@@ -30,6 +30,9 @@ contextBridge.exposeInMainWorld("desktop", {
   inputSource: {
     useEnglish: () => ipcRenderer.invoke("input-source:english"),
   },
+  ui: {
+    setModalOpen: (value) => ipcRenderer.send("ui:modal-open", value),
+  },
   terminal: {
     start: (host) => ipcRenderer.invoke("terminal:start", host),
     startLocal: () => ipcRenderer.invoke("terminal:start-local"),

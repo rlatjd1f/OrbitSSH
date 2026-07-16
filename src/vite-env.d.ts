@@ -92,6 +92,9 @@ interface Window {
     inputSource: {
       useEnglish(): Promise<boolean>;
     };
+    ui: {
+      setModalOpen(value: boolean): void;
+    };
     terminal: {
       start(host: ConnectionHost): Promise<string>;
       startLocal(): Promise<string>;
