@@ -96,6 +96,7 @@ interface Window {
           | "previous-pane"
           | "next-pane"
           | "duplicate-tab"
+          | "open-session"
           | "split-tab"
           | "open-settings"
           | "copy-selection",

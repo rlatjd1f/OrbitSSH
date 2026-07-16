@@ -424,9 +424,10 @@ function App() {
   const [activeTabId, setActiveTabId] = useState("");
   const [sessions, setSessions] = useState<Session[]>([]);
   const [query, setQuery] = useState("");
-  const [dialog, setDialog] = useState<"host" | "group" | "settings" | null>(
-    null,
-  );
+  const [dialog, setDialog] = useState<
+    "host" | "group" | "settings" | "session" | null
+  >(null);
+  const [sessionPickerHostId, setSessionPickerHostId] = useState("");
   const [editing, setEditing] = useState<ConnectionHost | null>(null);
   const [settings, setSettings] = useState<AppSettings>(defaultSettings);
   const [settingsDraft, setSettingsDraft] =
@@ -561,6 +562,16 @@ function App() {
   const openSettings = () => {
     setSettingsDraft(settings);
     setDialog("settings");
+  };
+  const openSessionPicker = () => {
+    const firstHost = store.hosts[0];
+    setSessionPickerHostId(firstHost?.id ?? "");
+    setDialog("session");
+  };
+  const openPickedSession = (host?: ConnectionHost) => {
+    if (!host) return;
+    setDialog(null);
+    void connect(host);
   };
   const openHostDialog = (host?: ConnectionHost) => {
     setEditing(host ?? null);
@@ -797,6 +808,10 @@ function App() {
         if (action === "copy-selection") {
           const selection = activeTerminalInstance?.getSelection();
           if (selection) window.desktop?.clipboard.writeText(selection);
+          return;
+        }
+        if (action === "open-session") {
+          openSessionPicker();
           return;
         }
         if (action === "close-tab") {
@@ -1220,6 +1235,83 @@ function App() {
                 onDownloadUpdate={() => void downloadUpdate()}
                 onOpenRelease={() => void window.desktop?.updates.openRelease()}
               />
+            ) : dialog === "session" ? (
+              <div className="session-picker">
+                <h2>{t("newSession")}</h2>
+                <p>{t("newSessionDescription")}</p>
+                {store.hosts.length > 0 ? (
+                  <div
+                    className="session-picker-list"
+                    role="listbox"
+                    aria-label={t("newSession")}
+                  >
+                    {store.groups.map((group) => {
+                      const hosts = store.hosts.filter(
+                        (host) => host.groupId === group.id,
+                      );
+                      if (!hosts.length) return null;
+                      return (
+                        <section key={group.id}>
+                          <h3>{group.name}</h3>
+                          {hosts.map((host) => (
+                            <button
+                              key={host.id}
+                              type="button"
+                              role="option"
+                              aria-selected={sessionPickerHostId === host.id}
+                              className={
+                                sessionPickerHostId === host.id
+                                  ? "selected"
+                                  : ""
+                              }
+                              data-testid="session-picker-host"
+                              autoFocus={sessionPickerHostId === host.id}
+                              onClick={() => setSessionPickerHostId(host.id)}
+                              onDoubleClick={() => openPickedSession(host)}
+                              onKeyDown={(event) => {
+                                if (event.key !== "Enter") return;
+                                event.preventDefault();
+                                openPickedSession(host);
+                              }}
+                            >
+                              <span className="status idle" />
+                              <Server />
+                              <span>
+                                <b>{host.name}</b>
+                                <small>
+                                  {host.user}@{host.host}:{host.port}
+                                </small>
+                              </span>
+                            </button>
+                          ))}
+                        </section>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="session-picker-empty">{t("noServersToOpen")}</p>
+                )}
+                <div className="modal-actions">
+                  <button type="button" onClick={() => setDialog(null)}>
+                    {t("cancel")}
+                  </button>
+                  <button
+                    type="button"
+                    className="primary"
+                    data-testid="session-picker-open"
+                    disabled={!sessionPickerHostId}
+                    onClick={() =>
+                      openPickedSession(
+                        store.hosts.find(
+                          (host) => host.id === sessionPickerHostId,
+                        ),
+                      )
+                    }
+                  >
+                    {t("openSession")}
+                  </button>
+                </div>
+              </div>
             ) : dialog === "group" ? (
               <form onSubmit={submitGroup}>
                 <h2>{t("newFolder")}</h2>

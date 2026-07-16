@@ -583,6 +583,7 @@ function createWindow() {
     const reportedControl = input.control || modifiers.includes("control");
     const shortcutTargetKey =
       key === "c" ||
+      key === "n" ||
       key === "t" ||
       key === "[" ||
       key === "]" ||
@@ -636,6 +637,15 @@ function createWindow() {
     } else if (key === "d" && input.meta) {
       event.preventDefault();
       mainWindow.webContents.send("shortcut:action", "split-tab");
+    } else if (
+      input.type === "keyDown" &&
+      key === "n" &&
+      controlPressed &&
+      (!input.meta || remappedControlShortcut)
+    ) {
+      event.preventDefault();
+      logShortcut("shortcut:dispatch", { action: "open-session" });
+      mainWindow.webContents.send("shortcut:action", "open-session");
     } else if (
       input.type === "keyDown" &&
       controlPressed &&
@@ -1349,6 +1359,60 @@ app.whenReady().then(() => {
           (await mainWindow.webContents.executeJavaScript(
             `(()=>{const tabs=[...document.querySelectorAll('.tabs button')].filter(el=>el.textContent.includes('test-host'));return tabs.length===3&&tabs[2].classList.contains('active')&&document.querySelectorAll('.terminal-pane:not(.cached)').length===1})()`,
           ));
+        const openSessionPicker = async () => {
+          mainWindow.webContents.sendInputEvent({
+            type: "keyDown",
+            keyCode: "N",
+            modifiers: ["control"],
+          });
+          mainWindow.webContents.sendInputEvent({
+            type: "keyUp",
+            keyCode: "N",
+            modifiers: ["control"],
+          });
+          await new Promise((resolve) => setTimeout(resolve, 120));
+        };
+        const sessionTabsCount = () =>
+          mainWindow.webContents.executeJavaScript(
+            `(()=>[...document.querySelectorAll('.tabs button')].filter(el=>el.textContent.includes('test-host')).length)()`,
+          );
+        await openSessionPicker();
+        const sessionPickerOpened =
+          await mainWindow.webContents.executeJavaScript(
+            `(()=>document.querySelector('.session-picker h2')?.textContent==='새 세션'&&document.querySelectorAll('[data-testid="session-picker-host"]').length===1)()`,
+          );
+        const startsBeforeSessionButton = terminalStartCount;
+        await mainWindow.webContents.executeJavaScript(
+          `(()=>document.querySelector('[data-testid="session-picker-open"]')?.click())()`,
+        );
+        await new Promise((resolve) => setTimeout(resolve, 200));
+        result.ctrlNOpenButtonStartsSession =
+          sessionPickerOpened &&
+          terminalStartCount === startsBeforeSessionButton + 1 &&
+          (await sessionTabsCount()) === 4;
+        await openSessionPicker();
+        const startsBeforeSessionEnter = terminalStartCount;
+        mainWindow.webContents.sendInputEvent({
+          type: "keyDown",
+          keyCode: "Enter",
+        });
+        mainWindow.webContents.sendInputEvent({
+          type: "keyUp",
+          keyCode: "Enter",
+        });
+        await new Promise((resolve) => setTimeout(resolve, 200));
+        result.ctrlNEnterStartsSession =
+          terminalStartCount === startsBeforeSessionEnter + 1 &&
+          (await sessionTabsCount()) === 5;
+        await openSessionPicker();
+        const startsBeforeSessionDoubleClick = terminalStartCount;
+        await mainWindow.webContents.executeJavaScript(
+          `(()=>{const host=document.querySelector('[data-testid="session-picker-host"]');host?.dispatchEvent(new MouseEvent('dblclick',{bubbles:true}));})()`,
+        );
+        await new Promise((resolve) => setTimeout(resolve, 200));
+        result.ctrlNDoubleClickStartsSession =
+          terminalStartCount === startsBeforeSessionDoubleClick + 1 &&
+          (await sessionTabsCount()) === 6;
         const passed =
           result.settingsShortcut &&
           result.englishLanguagePreview &&
@@ -1396,7 +1460,10 @@ app.whenReady().then(() => {
           result.splitCloseOneByOne &&
           result.topTabRemainsAfterPaneClose &&
           result.ctrlTOpensDuplicateTab &&
-          result.remappedCtrlTOpensDuplicateTab;
+          result.remappedCtrlTOpensDuplicateTab &&
+          result.ctrlNOpenButtonStartsSession &&
+          result.ctrlNEnterStartsSession &&
+          result.ctrlNDoubleClickStartsSession;
         console.log(
           `UI integration: ${passed ? "OK" : "FAIL"} ${JSON.stringify(result)}`,
         );
