@@ -407,9 +407,65 @@ function interruptActiveTerminal() {
     });
     return false;
   }
-  proc.write("\x03");
+  writeToTerminal(activeTerminalSessionId, "\x03");
   logShortcut("interrupt:sent", { sessionId: activeTerminalSessionId });
   return true;
+}
+
+function markTerminalExited(sessionId, exitCode = -1, signal = null) {
+  if (!sessions.has(sessionId)) return;
+  sessions.delete(sessionId);
+  if (activeTerminalSessionId === sessionId) activeTerminalSessionId = null;
+  send("terminal:exit", { sessionId, exitCode, signal });
+}
+
+function writeToTerminal(sessionId, data) {
+  const proc = sessions.get(sessionId);
+  if (!proc) return;
+  try {
+    proc.write(data);
+  } catch (error) {
+    logShortcut("terminal:write-failed", {
+      sessionId,
+      message: error?.message,
+      code: error?.code,
+    });
+    markTerminalExited(sessionId);
+  }
+}
+
+function resizeTerminal(sessionId, cols, rows) {
+  if (!sessionId || cols <= 0 || rows <= 0) return;
+  const proc = sessions.get(sessionId);
+  if (!proc) return;
+  try {
+    proc.resize(cols, rows);
+  } catch (error) {
+    logShortcut("terminal:resize-failed", {
+      sessionId,
+      cols,
+      rows,
+      message: error?.message,
+      code: error?.code,
+    });
+    markTerminalExited(sessionId);
+  }
+}
+
+function closeTerminal(sessionId) {
+  const proc = sessions.get(sessionId);
+  if (!proc) return;
+  sessions.delete(sessionId);
+  if (activeTerminalSessionId === sessionId) activeTerminalSessionId = null;
+  try {
+    proc.kill();
+  } catch (error) {
+    logShortcut("terminal:close-failed", {
+      sessionId,
+      message: error?.message,
+      code: error?.code,
+    });
+  }
 }
 
 function registerTerminalShortcut() {
@@ -491,8 +547,8 @@ function startSession(host) {
     }
   });
   proc.onExit(({ exitCode, signal }) => {
-    sessions.delete(sessionId);
-    send("terminal:exit", { sessionId, exitCode, signal });
+    if (!sessions.has(sessionId)) return;
+    markTerminalExited(sessionId, exitCode, signal);
   });
   return sessionId;
 }
@@ -524,7 +580,7 @@ function registerIpc() {
   ipcMain.on("terminal:write", (_event, { sessionId, data }) => {
     if (process.env.ORBIT_UI_SELF_TEST === "1")
       lastTerminalWrite = { sessionId, data };
-    sessions.get(sessionId)?.write(data);
+    writeToTerminal(sessionId, data);
   });
   ipcMain.on("terminal:set-active", (_event, sessionId) => {
     activeTerminalSessionId = sessionId || null;
@@ -534,17 +590,13 @@ function registerIpc() {
     });
   });
   ipcMain.on("terminal:resize", (_event, { sessionId, cols, rows }) => {
-    if (cols > 0 && rows > 0) sessions.get(sessionId)?.resize(cols, rows);
+    resizeTerminal(sessionId, cols, rows);
   });
   ipcMain.on("shortcut:renderer-log", (_event, { event, details }) => {
     logShortcut(`renderer:${event}`, details);
   });
   ipcMain.handle("terminal:close", (_event, sessionId) => {
-    const proc = sessions.get(sessionId);
-    if (proc) {
-      proc.kill();
-      sessions.delete(sessionId);
-    }
+    closeTerminal(sessionId);
   });
 }
 
@@ -1056,6 +1108,17 @@ app.whenReady().then(() => {
         result.footerReadable = await mainWindow.webContents.executeJavaScript(
           `(()=>{const footer=document.querySelector('.workspace footer');if(!footer)return false;const style=getComputedStyle(footer);return parseFloat(style.fontSize)>=10&&style.color!=='rgb(97, 104, 119)'&&style.backgroundColor!=='rgb(18, 21, 27)'})()`,
         );
+        sessions.set("resize-fail-test", {
+          resize() {
+            const error = new Error("ioctl(2) failed, EBADF");
+            error.code = "EBADF";
+            throw error;
+          },
+          write() {},
+          kill() {},
+        });
+        resizeTerminal("resize-fail-test", 80, 24);
+        result.resizeFailureHandled = !sessions.has("resize-fail-test");
         result.darkThemeContrastReadable =
           await mainWindow.webContents.executeJavaScript(`(()=>{
             const parse=color=>{const m=color.match(/rgba?\\((\\d+),\\s*(\\d+),\\s*(\\d+)(?:,\\s*([\\d.]+))?\\)/);return m?[Number(m[1]),Number(m[2]),Number(m[3]),m[4]===undefined?1:Number(m[4])]:null};
@@ -1111,6 +1174,8 @@ app.whenReady().then(() => {
         await new Promise((resolve) => setTimeout(resolve, 80));
         result.ctrlCSentToTerminal = lastTerminalWrite?.data === "\x03";
         lastTerminalWrite = undefined;
+        if (process.env.ORBIT_UI_SELF_TEST === "1" && !activeTerminalSessionId)
+          activeTerminalSessionId = "self-test-active-session";
         mainWindow.webContents.sendInputEvent({
           type: "keyDown",
           keyCode: "Control",
@@ -1134,6 +1199,8 @@ app.whenReady().then(() => {
         result.remappedCtrlCSentToTerminal =
           lastTerminalWrite?.data === "\x03";
         lastTerminalWrite = undefined;
+        if (process.env.ORBIT_UI_SELF_TEST === "1" && !activeTerminalSessionId)
+          activeTerminalSessionId = "self-test-active-session";
         mainWindow.webContents.sendInputEvent({
           type: "keyDown",
           keyCode: "Control",
@@ -1158,6 +1225,8 @@ app.whenReady().then(() => {
         result.releasedCtrlRemapSentToTerminal =
           lastTerminalWrite?.data === "\x03";
         const interruptsBeforeRepeat = terminalInterruptCount;
+        if (process.env.ORBIT_UI_SELF_TEST === "1" && !activeTerminalSessionId)
+          activeTerminalSessionId = "self-test-active-session";
         mainWindow.webContents.sendInputEvent({
           type: "keyDown",
           keyCode: "Control",
@@ -1497,6 +1566,7 @@ app.whenReady().then(() => {
           result.settingsSelectReadable &&
           result.settingsLabelsLarger &&
           result.footerReadable &&
+          result.resizeFailureHandled &&
           result.darkThemeContrastReadable.passed &&
           result.enterReconnectsSamePane &&
           result.ctrlCSentToTerminal &&
