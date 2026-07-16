@@ -52,6 +52,10 @@ function isNewerVersion(latest, current) {
   return false;
 }
 
+function effectiveAppVersion() {
+  return process.env.ORBIT_DESKTOP_TEST_VERSION || app.getVersion();
+}
+
 function currentAppBundlePath() {
   if (!app.isPackaged) return path.join("/Applications", appBundleName);
   let current = process.execPath;
@@ -144,7 +148,7 @@ function installDmgUpdate(dmgPath) {
 }
 
 async function checkForUpdate(force = false) {
-  const currentVersion = app.getVersion();
+  const currentVersion = effectiveAppVersion();
   if (process.env.ORBIT_UI_SELF_TEST === "1") {
     availableUpdate = {
       assetUrl: `https://github.com/rlatjd1f/OrbitSSH/releases/download/v0.4.0/OrbitSSH-0.4.0-${process.arch}.dmg`,
@@ -728,7 +732,7 @@ function startLocalSession() {
 }
 
 function registerIpc() {
-  ipcMain.handle("app:get-version", () => app.getVersion());
+  ipcMain.handle("app:get-version", () => effectiveAppVersion());
   ipcMain.handle("update:check", (_event, force) =>
     checkForUpdate(Boolean(force)),
   );

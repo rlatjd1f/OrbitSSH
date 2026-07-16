@@ -218,6 +218,8 @@ npm run desktop
 npm run rebuild:native
 ```
 
+`npm run desktop`은 업데이트 UI 테스트를 쉽게 하기 위해 앱 내부 표시 버전과 업데이트 비교 기준을 `0.0.0`으로 고정합니다. 실제 릴리즈 버전과 패키징 검증에는 `package.json`의 버전이 그대로 사용됩니다.
+
 ## 🗂️ 프로젝트 구조
 
 ```text
