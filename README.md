@@ -122,7 +122,16 @@ npm version patch -m "chore(release): 버전 v%s 배포"
 git push origin main --follow-tags
 ```
 
-현재 자동 빌드에는 Apple Developer ID 코드 서명과 공증이 적용되지 않습니다. 따라서 다운로드한 앱을 처음 실행할 때 macOS Gatekeeper 경고가 표시될 수 있습니다.
+현재 자동 빌드에는 Apple Developer ID 공증이 적용되지 않습니다. 따라서 다운로드한 앱을 처음 실행할 때 macOS Gatekeeper 경고가 표시될 수 있습니다.
+
+Chrome 또는 Safari로 받은 앱에서 **“Orbit SSH은(는) 손상되었기 때문에 열 수 없습니다”** 메시지가 표시되면, 앱을 Applications 폴더로 옮긴 뒤 다음 명령으로 다운로드 격리 속성을 제거합니다.
+
+```bash
+xattr -dr com.apple.quarantine "/Applications/Orbit SSH.app"
+open "/Applications/Orbit SSH.app"
+```
+
+이 명령은 앱 파일을 수정하지 않고 macOS가 다운로드 파일에 붙인 quarantine 플래그만 제거합니다. 공개 배포에서 이 절차를 없애려면 Apple Developer ID 인증서로 코드 서명하고 Apple notarization을 적용해야 합니다.
 
 ## 🔐 SSH 연결 등록
 
@@ -180,7 +189,7 @@ Orbit SSH는 실행 시 GitHub의 최신 정식 릴리즈 태그를 확인합니
 - **설정 → 앱 업데이트**에서 현재 버전과 Mac 종류를 확인하거나 업데이트를 다시 검사할 수 있습니다.
 - **DMG 받기**를 누르면 macOS의 다운로드 폴더에 설치 파일을 저장하고 자동으로 엽니다.
 
-현재 릴리스는 Apple Developer ID 서명과 공증이 적용되지 않았으므로 앱을 백그라운드에서 자동 교체하지 않습니다. 열린 DMG에서 Orbit SSH를 Applications 폴더로 옮겨 직접 설치해 주세요.
+현재 릴리스는 Apple Developer ID 공증이 적용되지 않았으므로 앱을 백그라운드에서 자동 교체하지 않습니다. 열린 DMG에서 Orbit SSH를 Applications 폴더로 옮겨 직접 설치해 주세요.
 
 ## 💾 데이터 저장 위치
 
