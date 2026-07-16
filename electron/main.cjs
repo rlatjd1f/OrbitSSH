@@ -1083,10 +1083,16 @@ app.whenReady().then(() => {
           duplicatedHost?.dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,clientX:190,clientY:270})); await wait(80);
           document.querySelector('[data-testid="delete-session"]')?.click(); await wait(160);
           const duplicatedHostDeleted=![...document.querySelectorAll('.host-row')].some(el=>el.textContent.includes('alpha-box (1)'));
+          alphaHost.dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,clientX:180,clientY:250})); await wait(80);
+          document.querySelector('[data-testid="duplicate-session"]')?.click(); await wait(120);
+          const keyboardDeleteTarget=[...document.querySelectorAll('.host-row')].find(el=>el.textContent.includes('alpha-box (1)'));
+          keyboardDeleteTarget?.focus();
+          keyboardDeleteTarget?.dispatchEvent(new KeyboardEvent('keydown',{key:'Delete',bubbles:true})); await wait(180);
+          const sidebarDeleteKeyDeleted=![...document.querySelectorAll('.host-row')].some(el=>el.textContent.includes('alpha-box (1)'));
           terminalTabs[activeBefore]?.click(); await wait(80);
           window.__preservedPane=document.querySelector('.terminal-pane.focused');
           window.__preservedText=window.__preservedPane?.textContent??'';
-          return {folderOpened,modalBackdropClear,escapeClosed,passwordVisible,keyVisible,equipmentNameBlank,hostDefaultsToAny,userBlank,placeholderIsGray,equipmentLabel,duplicateTabsOpened,activeBefore,sidebarMovedDown,sidebarMovedUp,sidebarTreeStyled,contextMenuOpened,duplicateSessionCreated,duplicatedHostDeleted};
+          return {folderOpened,modalBackdropClear,escapeClosed,passwordVisible,keyVisible,equipmentNameBlank,hostDefaultsToAny,userBlank,placeholderIsGray,equipmentLabel,duplicateTabsOpened,activeBefore,sidebarMovedDown,sidebarMovedUp,sidebarTreeStyled,contextMenuOpened,duplicateSessionCreated,duplicatedHostDeleted,sidebarDeleteKeyDeleted};
         })()`);
         result.settingsShortcut =
           settingsCheck.settingsOpened && settingsCheck.settingsClosed;
@@ -1631,6 +1637,7 @@ app.whenReady().then(() => {
           result.contextMenuOpened &&
           result.duplicateSessionCreated &&
           result.duplicatedHostDeleted &&
+          result.sidebarDeleteKeyDeleted &&
           result.modalBackdropClear &&
           result.escapeClosed &&
           result.passwordVisible &&

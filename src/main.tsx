@@ -734,6 +734,17 @@ function App() {
     setExpanded((current) => new Set(current).add(duplicated.groupId));
     setSelectedHostId(duplicated.id);
   };
+  const removeSelectedSidebarHost = () => {
+    const focusedHostId =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement.dataset.sidebarHostId
+        : "";
+    const host = visibleSidebarHosts.find(
+      (item) => item.id === (focusedHostId || selectedHostId),
+    );
+    if (!host) return;
+    void removeHost(host);
+  };
   const removeGroup = async (group: ConnectionGroup) => {
     if (store.hosts.some((h) => h.groupId === group.id)) {
       alert(t("groupNotEmpty"));
@@ -1082,6 +1093,12 @@ function App() {
               if (!host) return;
               event.preventDefault();
               void connect(host);
+              return;
+            }
+            if (event.key === "Delete" || event.key === "Backspace") {
+              event.preventDefault();
+              event.stopPropagation();
+              removeSelectedSidebarHost();
             }
           }}
         >
