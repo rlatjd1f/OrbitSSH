@@ -504,6 +504,10 @@
   text-align: left;
   cursor: pointer;
 }
+.session-picker-list button.local-session {
+  grid-template-columns: 18px minmax(130px, 0.8fr) minmax(180px, 1fr);
+  padding-left: 15px;
+}
 .session-picker-list button:hover {
   border-color: #4c5261;
   background: #191d26;
@@ -515,6 +519,9 @@
 .session-picker-list svg {
   width: 16px;
   color: #81899b;
+}
+.session-picker-list .local-session svg {
+  color: #8f98ad;
 }
 .session-picker-name {
   min-width: 0;

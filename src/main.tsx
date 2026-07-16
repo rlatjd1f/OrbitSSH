@@ -1763,8 +1763,8 @@ function App() {
                         aria-selected={sessionPickerHostId === LOCAL_HOST_ID}
                         className={
                           sessionPickerHostId === LOCAL_HOST_ID
-                            ? "selected"
-                            : ""
+                            ? "selected local-session"
+                            : "local-session"
                         }
                         data-testid="session-picker-host"
                         data-session-host-id={LOCAL_HOST_ID}
@@ -1810,7 +1810,6 @@ function App() {
                           }
                         }}
                       >
-                        <span className="status connected" />
                         <TerminalSquare />
                         <span className="session-picker-name">
                           <b>{t("localTerminal")}</b>
