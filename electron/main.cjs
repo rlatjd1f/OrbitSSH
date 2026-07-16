@@ -926,6 +926,7 @@ function installApplicationMenu(language = loadSettings().language) {
     ? {
         about: "Orbit SSH 정보",
         settings: "설정…",
+        checkUpdates: "업데이트 확인…",
         hide: "Orbit SSH 가리기",
         hideOthers: "다른 항목 가리기",
         showAll: "모두 보기",
@@ -946,6 +947,7 @@ function installApplicationMenu(language = loadSettings().language) {
     : {
         about: "About Orbit SSH",
         settings: "Settings…",
+        checkUpdates: "Check for Updates…",
         hide: "Hide Orbit SSH",
         hideOthers: "Hide Others",
         showAll: "Show All",
@@ -974,6 +976,10 @@ function installApplicationMenu(language = loadSettings().language) {
                 label: menuText.settings,
                 accelerator: "Command+,",
                 click: () => send("shortcut:action", "open-settings"),
+              },
+              {
+                label: menuText.checkUpdates,
+                click: () => send("shortcut:action", "check-updates"),
               },
               { type: "separator" },
               { role: "hide", label: menuText.hide },
@@ -1307,6 +1313,7 @@ app.whenReady().then(() => {
           englishMenuLabels?.includes("Edit") &&
           englishMenuLabels?.includes("Window") &&
           englishMenuLabels?.includes("Settings…") &&
+          englishMenuLabels?.includes("Check for Updates…") &&
           englishMenuLabels?.includes("Interrupt") &&
           englishMenuLabels?.includes("Copy");
         result.koreanLanguageRestored =
@@ -1318,6 +1325,7 @@ app.whenReady().then(() => {
           koreanMenuLabels?.includes("편집") &&
           koreanMenuLabels?.includes("윈도우") &&
           koreanMenuLabels?.includes("설정…") &&
+          koreanMenuLabels?.includes("업데이트 확인…") &&
           koreanMenuLabels?.includes("작업 중단") &&
           koreanMenuLabels?.includes("복사");
         result.appVersionVisible = settingsCheck.appVersionVisible;

@@ -110,6 +110,7 @@ interface Window {
           | "open-session"
           | "split-tab"
           | "open-settings"
+          | "check-updates"
           | "copy-selection",
       ) => void,
     ): () => void;

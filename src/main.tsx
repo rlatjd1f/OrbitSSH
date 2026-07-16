@@ -1177,6 +1177,11 @@ function App() {
           openSettings();
           return;
         }
+        if (action === "check-updates") {
+          openSettings();
+          void checkUpdates();
+          return;
+        }
         if (action === "copy-selection") {
           const selection = activeTerminalInstance?.getSelection();
           if (selection) window.desktop?.clipboard.writeText(selection);
