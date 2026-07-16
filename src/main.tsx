@@ -44,6 +44,9 @@ type SessionHostView = Pick<
   ConnectionHost,
   "id" | "name" | "host" | "user" | "port"
 > & { kind: TerminalStartKind };
+type SessionPickerItem =
+  | { id: typeof LOCAL_HOST_ID; kind: "local" }
+  | { id: string; kind: "ssh"; host: ConnectionHost; group: ConnectionGroup };
 const LOCAL_HOST_ID = "__orbit-local-terminal__";
 const emptyStore: ConnectionStore = { groups: [], hosts: [] };
 const defaultSettings: AppSettings = {
@@ -510,17 +513,26 @@ function App() {
       .filter((host) => host.groupId === group.id)
       .map((host) => ({ host, group })),
   );
+  const sessionPickerItems: SessionPickerItem[] = [
+    { id: LOCAL_HOST_ID, kind: "local" },
+    ...sessionPickerHosts.map(({ host, group }) => ({
+      id: host.id,
+      kind: "ssh" as const,
+      host,
+      group,
+    })),
+  ];
   const moveSessionPickerSelection = (direction: -1 | 1) => {
-    if (!sessionPickerHosts.length) return;
-    const index = sessionPickerHosts.findIndex(
-      ({ host }) => host.id === sessionPickerHostId,
+    if (!sessionPickerItems.length) return;
+    const index = sessionPickerItems.findIndex(
+      (item) => item.id === sessionPickerHostId,
     );
     const next =
-      sessionPickerHosts[
-        (index + direction + sessionPickerHosts.length) %
-          sessionPickerHosts.length
+      sessionPickerItems[
+        (index + direction + sessionPickerItems.length) %
+          sessionPickerItems.length
       ];
-    setSessionPickerHostId(next.host.id);
+    setSessionPickerHostId(next.id);
   };
 
   useEffect(() => {
@@ -636,14 +648,14 @@ function App() {
     setDialog("settings");
   };
   const openSessionPicker = () => {
-    const firstHost = sessionPickerHosts[0]?.host ?? store.hosts[0];
-    setSessionPickerHostId(firstHost?.id ?? "");
+    setSessionPickerHostId(LOCAL_HOST_ID);
     setDialog("session");
   };
-  const openPickedSession = (host?: ConnectionHost) => {
-    if (!host) return;
+  const openPickedSession = (item?: SessionPickerItem) => {
+    if (!item) return;
     setDialog(null);
-    void connect(host);
+    if (item.kind === "local") void openLocalTerminal();
+    else void connect(item.host);
   };
   const openHostDialog = (host?: ConnectionHost) => {
     setEditing(host ?? null);
@@ -1536,12 +1548,75 @@ function App() {
               <div className="session-picker">
                 <h2>{t("newSession")}</h2>
                 <p>{t("newSessionDescription")}</p>
-                {store.hosts.length > 0 ? (
+                {sessionPickerItems.length > 0 ? (
                   <div
                     className="session-picker-list"
                     role="listbox"
                     aria-label={t("newSession")}
                   >
+                    <section>
+                      <h3>{t("localMachine")}</h3>
+                      <button
+                        type="button"
+                        role="option"
+                        aria-selected={sessionPickerHostId === LOCAL_HOST_ID}
+                        className={
+                          sessionPickerHostId === LOCAL_HOST_ID
+                            ? "selected"
+                            : ""
+                        }
+                        data-testid="session-picker-host"
+                        data-session-host-id={LOCAL_HOST_ID}
+                        autoFocus={sessionPickerHostId === LOCAL_HOST_ID}
+                        ref={(element) => {
+                          if (
+                            element &&
+                            sessionPickerHostId === LOCAL_HOST_ID &&
+                            document.activeElement?.closest(".session-picker")
+                          )
+                            element.scrollIntoView({ block: "nearest" });
+                        }}
+                        onClick={() => setSessionPickerHostId(LOCAL_HOST_ID)}
+                        onDoubleClick={() =>
+                          openPickedSession({
+                            id: LOCAL_HOST_ID,
+                            kind: "local",
+                          })
+                        }
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") {
+                            event.preventDefault();
+                            openPickedSession({
+                              id: LOCAL_HOST_ID,
+                              kind: "local",
+                            });
+                            return;
+                          }
+                          if (
+                            event.key === "ArrowDown" ||
+                            event.key === "Down"
+                          ) {
+                            event.preventDefault();
+                            moveSessionPickerSelection(1);
+                            return;
+                          }
+                          if (
+                            event.key === "ArrowUp" ||
+                            event.key === "Up"
+                          ) {
+                            event.preventDefault();
+                            moveSessionPickerSelection(-1);
+                          }
+                        }}
+                      >
+                        <span className="status connected" />
+                        <TerminalSquare />
+                        <span className="session-picker-name">
+                          <b>{t("localTerminal")}</b>
+                        </span>
+                        <small>{t("systemShell")}</small>
+                      </button>
+                    </section>
                     {store.groups.map((group) => {
                       const hosts = sessionPickerHosts.filter(
                         (item) => item.group.id === group.id,
@@ -1577,11 +1652,23 @@ function App() {
                                   });
                               }}
                               onClick={() => setSessionPickerHostId(host.id)}
-                              onDoubleClick={() => openPickedSession(host)}
+                              onDoubleClick={() =>
+                                openPickedSession({
+                                  id: host.id,
+                                  kind: "ssh",
+                                  host,
+                                  group,
+                                })
+                              }
                               onKeyDown={(event) => {
                                 if (event.key === "Enter") {
                                   event.preventDefault();
-                                  openPickedSession(host);
+                                  openPickedSession({
+                                    id: host.id,
+                                    kind: "ssh",
+                                    host,
+                                    group,
+                                  });
                                   return;
                                 }
                                 if (
@@ -1629,8 +1716,8 @@ function App() {
                     disabled={!sessionPickerHostId}
                     onClick={() =>
                       openPickedSession(
-                        store.hosts.find(
-                          (host) => host.id === sessionPickerHostId,
+                        sessionPickerItems.find(
+                          (item) => item.id === sessionPickerHostId,
                         ),
                       )
                     }

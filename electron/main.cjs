@@ -1040,7 +1040,7 @@ app.whenReady().then(() => {
           document.querySelector('[data-testid="new-connection"]').click();await wait(30);
           const englishConnectionUi=document.querySelector('.modal h2')?.textContent==='New SSH connection'&&document.querySelector('[data-testid="device-name"]')?.getAttribute('aria-label')==='Device name'&&document.querySelector('.auth-options legend')?.textContent==='Authentication method';
           window.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape'}));await wait(30);
-          return {settingsOpened,englishPreview,englishAppUi,englishConnectionUi,defaultLocalSessionOpened,appVersionVisible:appVersion?.textContent.includes('v0.1.0'),updateAvailableVisible:Boolean(updateResult),fontOptionCount:font?.options.length,defaultScrollback,fontColor,labelFontSize,sectionFontSize,settingsClosed:!document.querySelector('.settings-modal')};
+          return {settingsOpened,englishPreview,englishAppUi,englishConnectionUi,defaultLocalSessionOpened,appVersionVisible:appVersion?.textContent.includes('v0.2.0'),updateAvailableVisible:Boolean(updateResult),fontOptionCount:font?.options.length,defaultScrollback,fontColor,labelFontSize,sectionFontSize,settingsClosed:!document.querySelector('.settings-modal')};
         })()`);
         const englishMenuLabels = Menu.getApplicationMenu()?.items.flatMap(
           (item) => [
@@ -1607,14 +1607,14 @@ app.whenReady().then(() => {
           });
           await new Promise((resolve) => setTimeout(resolve, 120));
         };
-        const sessionTabsCount = () =>
+        const workspaceTabsCount = () =>
           mainWindow.webContents.executeJavaScript(
-            `(()=>[...document.querySelectorAll('.tabs button')].filter(el=>el.textContent.includes('test-host')).length)()`,
+            `(()=>document.querySelectorAll('.tabs button:not(.tab-plus)').length)()`,
           );
         await openSessionPicker();
         const sessionPickerOpened =
           await mainWindow.webContents.executeJavaScript(
-            `(()=>document.querySelector('.session-picker h2')?.textContent==='새 세션'&&document.querySelectorAll('[data-testid="session-picker-host"]').length===2)()`,
+            `(()=>document.querySelector('.session-picker h2')?.textContent==='새 세션'&&document.querySelectorAll('[data-testid="session-picker-host"]').length===3&&document.querySelector('[data-testid="session-picker-host"] b')?.textContent==='로컬 터미널')()`,
           );
         mainWindow.webContents.sendInputEvent({
           type: "keyDown",
@@ -1627,7 +1627,7 @@ app.whenReady().then(() => {
         await new Promise((resolve) => setTimeout(resolve, 80));
         const arrowDownSelected =
           await mainWindow.webContents.executeJavaScript(
-            `(()=>document.querySelector('[data-testid="session-picker-host"].selected b')?.textContent==='alpha-box'&&document.activeElement?.dataset.sessionHostId==='alpha-box')()`,
+            `(()=>document.querySelector('[data-testid="session-picker-host"].selected b')?.textContent==='test-host'&&document.activeElement?.dataset.sessionHostId==='test-host')()`,
           );
         mainWindow.webContents.sendInputEvent({
           type: "keyDown",
@@ -1640,7 +1640,7 @@ app.whenReady().then(() => {
         await new Promise((resolve) => setTimeout(resolve, 80));
         const arrowUpSelected =
           await mainWindow.webContents.executeJavaScript(
-            `(()=>document.querySelector('[data-testid="session-picker-host"].selected b')?.textContent==='test-host'&&document.activeElement?.dataset.sessionHostId==='test-host')()`,
+            `(()=>document.querySelector('[data-testid="session-picker-host"].selected b')?.textContent==='로컬 터미널'&&document.activeElement?.dataset.sessionHostId==='__orbit-local-terminal__')()`,
           );
         result.sessionPickerArrowNavigation =
           arrowDownSelected && arrowUpSelected;
@@ -1656,7 +1656,7 @@ app.whenReady().then(() => {
         result.ctrlNOpenButtonStartsSession =
           sessionPickerOpened &&
           terminalStartCount === startsBeforeSessionButton + 1 &&
-          (await sessionTabsCount()) === 4;
+          (await workspaceTabsCount()) === 4;
         await openSessionPicker();
         const startsBeforeSessionEnter = terminalStartCount;
         mainWindow.webContents.sendInputEvent({
@@ -1670,7 +1670,7 @@ app.whenReady().then(() => {
         await new Promise((resolve) => setTimeout(resolve, 200));
         result.ctrlNEnterStartsSession =
           terminalStartCount === startsBeforeSessionEnter + 1 &&
-          (await sessionTabsCount()) === 5;
+          (await workspaceTabsCount()) === 5;
         await openSessionPicker();
         const startsBeforeSessionDoubleClick = terminalStartCount;
         await mainWindow.webContents.executeJavaScript(
@@ -1679,7 +1679,7 @@ app.whenReady().then(() => {
         await new Promise((resolve) => setTimeout(resolve, 200));
         result.ctrlNDoubleClickStartsSession =
           terminalStartCount === startsBeforeSessionDoubleClick + 1 &&
-          (await sessionTabsCount()) === 6;
+          (await workspaceTabsCount()) === 6;
         const passed =
           result.settingsShortcut &&
           result.englishLanguagePreview &&
