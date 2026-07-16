@@ -146,7 +146,7 @@ function installDmgUpdate(dmgPath) {
     },
   );
   child.unref();
-  setTimeout(() => app.quit(), 350);
+  setTimeout(() => app.quit(), 1800);
   return { path: dmgPath, targetPath, installing: true };
 }
 

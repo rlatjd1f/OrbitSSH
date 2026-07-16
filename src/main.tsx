@@ -1880,6 +1880,17 @@ function App() {
           </button>
         </aside>
       )}
+      {updateStatus.phase === "installing" && (
+        <div className="update-applying-overlay" role="status" aria-live="assertive">
+          <div className="update-applying-card">
+            <div className="update-applying-spinner" aria-hidden="true">
+              <span />
+            </div>
+            <h2>{t("applyingUpdate")}</h2>
+            <p>{t("applyingUpdateDescription")}</p>
+          </div>
+        </div>
+      )}
       {dialog && (
         <div
           className="modal-backdrop"
