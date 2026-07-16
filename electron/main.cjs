@@ -536,6 +536,9 @@ function registerIpc() {
   ipcMain.on("terminal:resize", (_event, { sessionId, cols, rows }) => {
     if (cols > 0 && rows > 0) sessions.get(sessionId)?.resize(cols, rows);
   });
+  ipcMain.on("shortcut:renderer-log", (_event, { event, details }) => {
+    logShortcut(`renderer:${event}`, details);
+  });
   ipcMain.handle("terminal:close", (_event, sessionId) => {
     const proc = sessions.get(sessionId);
     if (proc) {
@@ -578,8 +581,15 @@ function createWindow() {
       if (input.type === "keyUp") lastPhysicalControlUpAt = Date.now();
     }
     const reportedControl = input.control || modifiers.includes("control");
+    const shortcutTargetKey =
+      key === "c" ||
+      key === "t" ||
+      key === "[" ||
+      key === "]" ||
+      input.code === "BracketLeft" ||
+      input.code === "BracketRight";
     const recentPhysicalControl =
-      key === "c" &&
+      shortcutTargetKey &&
       input.meta &&
       lastPhysicalControlUpAt > 0 &&
       Date.now() - lastPhysicalControlUpAt <= 250;
@@ -588,8 +598,13 @@ function createWindow() {
     const remappedControlC =
       key === "c" && input.meta && remappedControlCActive;
     const controlPressed =
-      reportedControl || physicalControlDown || remappedControlC;
-    if (key === "c" || reportedControl || isPhysicalControl)
+      reportedControl ||
+      physicalControlDown ||
+      recentPhysicalControl ||
+      remappedControlC;
+    const remappedControlShortcut =
+      input.meta && (recentPhysicalControl || remappedControlC);
+    if (shortcutTargetKey || reportedControl || isPhysicalControl)
       logShortcut("before-input-event", {
         type: input.type,
         key: input.key,
@@ -603,6 +618,7 @@ function createWindow() {
         recentPhysicalControl,
         remappedControlCActive,
         effectiveControl: controlPressed,
+        remappedControlShortcut,
         activeSessionId: activeTerminalSessionId,
       });
     if (key === "w" && (input.meta || input.control)) {
@@ -622,27 +638,30 @@ function createWindow() {
       mainWindow.webContents.send("shortcut:action", "split-tab");
     } else if (
       input.type === "keyDown" &&
-      (input.control || modifiers.includes("control")) &&
-      !input.meta &&
+      controlPressed &&
+      (!input.meta || remappedControlShortcut) &&
       (key === "[" || input.code === "BracketLeft")
     ) {
       event.preventDefault();
+      logShortcut("shortcut:dispatch", { action: "previous-pane" });
       mainWindow.webContents.send("shortcut:action", "previous-pane");
     } else if (
       input.type === "keyDown" &&
-      (input.control || modifiers.includes("control")) &&
-      !input.meta &&
+      controlPressed &&
+      (!input.meta || remappedControlShortcut) &&
       (key === "]" || input.code === "BracketRight")
     ) {
       event.preventDefault();
+      logShortcut("shortcut:dispatch", { action: "next-pane" });
       mainWindow.webContents.send("shortcut:action", "next-pane");
     } else if (
       input.type === "keyDown" &&
       key === "t" &&
-      (input.control || modifiers.includes("control")) &&
-      !input.meta
+      controlPressed &&
+      (!input.meta || remappedControlShortcut)
     ) {
       event.preventDefault();
+      logShortcut("shortcut:dispatch", { action: "duplicate-tab" });
       mainWindow.webContents.send("shortcut:action", "duplicate-tab");
     } else if (key === "," && (input.meta || input.control)) {
       event.preventDefault();
@@ -1303,6 +1322,33 @@ app.whenReady().then(() => {
           (await mainWindow.webContents.executeJavaScript(
             `(()=>{const tabs=[...document.querySelectorAll('.tabs button')].filter(el=>el.textContent.includes('test-host'));return tabs.length===2&&tabs[1].classList.contains('active')&&document.querySelectorAll('.terminal-pane:not(.cached)').length===1})()`,
           ));
+        const startsBeforeRemappedDuplicate = terminalStartCount;
+        mainWindow.webContents.sendInputEvent({
+          type: "keyDown",
+          keyCode: "Control",
+          modifiers: ["control"],
+        });
+        mainWindow.webContents.sendInputEvent({
+          type: "keyUp",
+          keyCode: "Control",
+        });
+        await new Promise((resolve) => setTimeout(resolve, 16));
+        mainWindow.webContents.sendInputEvent({
+          type: "keyDown",
+          keyCode: "T",
+          modifiers: ["meta"],
+        });
+        mainWindow.webContents.sendInputEvent({
+          type: "keyUp",
+          keyCode: "T",
+          modifiers: ["meta"],
+        });
+        await new Promise((resolve) => setTimeout(resolve, 200));
+        result.remappedCtrlTOpensDuplicateTab =
+          terminalStartCount === startsBeforeRemappedDuplicate + 1 &&
+          (await mainWindow.webContents.executeJavaScript(
+            `(()=>{const tabs=[...document.querySelectorAll('.tabs button')].filter(el=>el.textContent.includes('test-host'));return tabs.length===3&&tabs[2].classList.contains('active')&&document.querySelectorAll('.terminal-pane:not(.cached)').length===1})()`,
+          ));
         const passed =
           result.settingsShortcut &&
           result.englishLanguagePreview &&
@@ -1349,7 +1395,8 @@ app.whenReady().then(() => {
           result.ctrlBracketFocusedTerminal &&
           result.splitCloseOneByOne &&
           result.topTabRemainsAfterPaneClose &&
-          result.ctrlTOpensDuplicateTab;
+          result.ctrlTOpensDuplicateTab &&
+          result.remappedCtrlTOpensDuplicateTab;
         console.log(
           `UI integration: ${passed ? "OK" : "FAIL"} ${JSON.stringify(result)}`,
         );

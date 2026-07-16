@@ -85,6 +85,9 @@ interface Window {
       ): () => void;
     };
     clipboard: { writeText(value: string): void };
+    debug?: {
+      logShortcut(event: string, details?: Record<string, unknown>): void;
+    };
     onShortcut(
       callback: (
         action:

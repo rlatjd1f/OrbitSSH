@@ -48,6 +48,10 @@ contextBridge.exposeInMainWorld("desktop", {
   clipboard: {
     writeText: (value) => clipboard.writeText(value),
   },
+  debug: {
+    logShortcut: (event, details = {}) =>
+      ipcRenderer.send("shortcut:renderer-log", { event, details }),
+  },
   onShortcut: (callback) => {
     const fn = (_e, action) => callback(action);
     ipcRenderer.on("shortcut:action", fn);

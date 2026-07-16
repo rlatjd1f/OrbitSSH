@@ -823,8 +823,20 @@ function App() {
           return;
         }
         if (action === "duplicate-tab") {
+          window.desktop?.debug?.logShortcut("duplicate-tab:received", {
+            activeTabId,
+            activeWorkspaceId,
+            activeHostId: activeSession?.hostId ?? null,
+            visiblePaneCount: visibleSessions.length,
+            workspaceTabCount: workspaceTabs.length,
+          });
           if (activeSession) {
             const host = store.hosts.find((h) => h.id === activeSession.hostId);
+            window.desktop?.debug?.logShortcut("duplicate-tab:host", {
+              found: Boolean(host),
+              hostId: activeSession.hostId,
+              hostName: host?.name ?? null,
+            });
             if (host) void connect(host);
           }
           return;
