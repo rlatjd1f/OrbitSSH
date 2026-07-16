@@ -38,7 +38,7 @@ type UpdateInfo = {
   architecture: string;
 };
 type UpdateStatus = {
-  phase: "idle" | "checking" | "downloading" | "completed" | "error";
+  phase: "idle" | "checking" | "downloading" | "installing" | "completed" | "error";
   percent?: number;
   received?: number;
   total?: number;
@@ -56,7 +56,13 @@ interface Window {
     app: { getVersion(): Promise<string> };
     updates: {
       check(force?: boolean): Promise<UpdateInfo>;
-      download(): Promise<{ path: string; opened: boolean; openError: string }>;
+      download(): Promise<{
+        path: string;
+        targetPath?: string;
+        installing?: boolean;
+        opened?: boolean;
+        openError?: string;
+      }>;
       openRelease(): Promise<void>;
       onStatus(callback: (value: UpdateStatus) => void): () => void;
     };

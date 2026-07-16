@@ -295,6 +295,8 @@ function SettingsForm({
   const update = <K extends keyof AppSettings>(key: K, next: AppSettings[K]) =>
     onChange({ ...value, [key]: next });
   const isDownloading = updateStatus.phase === "downloading";
+  const isInstalling = updateStatus.phase === "installing";
+  const isUpdateBusy = isDownloading || isInstalling;
   const downloadPercent = Math.max(
     0,
     Math.min(100, Math.round(updateStatus.percent ?? 0)),
@@ -521,7 +523,7 @@ function SettingsForm({
                   onClick={onCheckUpdates}
                   disabled={
                     updateStatus.phase === "checking" ||
-                    updateStatus.phase === "downloading"
+                    isUpdateBusy
                   }
                 >
                   <RotateCw
@@ -561,11 +563,15 @@ function SettingsForm({
                       onClick={onDownloadUpdate}
                       disabled={
                         !updateInfo.assetName ||
-                        updateStatus.phase === "downloading"
+                        isUpdateBusy
                       }
                     >
                       <Download />{" "}
-                      {isDownloading ? t("downloadingUpdate") : t("downloadDmg")}
+                      {isInstalling
+                        ? t("installingUpdate")
+                        : isDownloading
+                          ? t("downloadingUpdate")
+                          : t("downloadDmg")}
                     </button>
                   </div>
                 </div>
@@ -593,6 +599,11 @@ function SettingsForm({
                     />
                   </div>
                 </div>
+              )}
+              {isInstalling && (
+                <p className="update-message success">
+                  {updateStatus.message || t("dmgOpened")}
+                </p>
               )}
               {updateStatus.phase === "completed" && (
                 <p className="update-message success">{t("dmgOpened")}</p>
@@ -1676,7 +1687,9 @@ function App() {
           <div>
             <b>Orbit SSH v{updateInfo.latestVersion}</b>
             <span>
-              {updateStatus.phase === "downloading"
+              {updateStatus.phase === "installing"
+                ? t("installingUpdate")
+                : updateStatus.phase === "downloading"
                 ? t("updateDownloadInProgress")
                 : t("newVersionAvailable")}
             </span>
@@ -1685,11 +1698,17 @@ function App() {
             type="button"
             className="update-toast-download"
             onClick={downloadUpdate}
-            disabled={!updateInfo.assetName || updateStatus.phase === "downloading"}
+            disabled={
+              !updateInfo.assetName ||
+              updateStatus.phase === "downloading" ||
+              updateStatus.phase === "installing"
+            }
           >
-            {updateStatus.phase === "downloading"
-              ? t("downloadingUpdate")
-              : t("downloadDmg")}
+            {updateStatus.phase === "installing"
+              ? t("installingUpdate")
+              : updateStatus.phase === "downloading"
+                ? t("downloadingUpdate")
+                : t("downloadDmg")}
           </button>
           <button type="button" className="update-toast-close" aria-label={t("dismissUpdate")} onClick={() => setUpdateDismissed(true)}>
             <X />

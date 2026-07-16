@@ -10,7 +10,7 @@ const {
 const path = require("node:path");
 const fs = require("node:fs");
 const crypto = require("node:crypto");
-const { execFile, execFileSync } = require("node:child_process");
+const { execFile, execFileSync, spawn } = require("node:child_process");
 const pty = require("node-pty");
 
 const isDev = !app.isPackaged;
@@ -30,6 +30,7 @@ let cachedUpdateResult = null;
 let lastUpdateCheckAt = 0;
 
 const updateRepository = "rlatjd1f/OrbitSSH";
+const appBundleName = "Orbit SSH.app";
 
 function versionParts(value) {
   return String(value)
@@ -49,6 +50,96 @@ function isNewerVersion(latest, current) {
     if (difference !== 0) return difference > 0;
   }
   return false;
+}
+
+function currentAppBundlePath() {
+  if (!app.isPackaged) return path.join("/Applications", appBundleName);
+  let current = process.execPath;
+  while (current !== path.dirname(current)) {
+    if (current.endsWith(".app")) return current;
+    current = path.dirname(current);
+  }
+  return path.join("/Applications", appBundleName);
+}
+
+function targetUpdateAppPath() {
+  const current = currentAppBundlePath();
+  if (current.startsWith("/Volumes/")) return path.join("/Applications", appBundleName);
+  return current;
+}
+
+function createUpdateInstallerScript() {
+  const scriptPath = path.join(
+    app.getPath("temp"),
+    `orbit-ssh-update-${crypto.randomUUID()}.sh`,
+  );
+  fs.writeFileSync(
+    scriptPath,
+    `#!/bin/bash
+set -euo pipefail
+
+DMG_PATH="$1"
+TARGET_APP="$2"
+BUNDLE_NAME="$3"
+OLD_PID="$4"
+
+MOUNT_DIR="$(mktemp -d /tmp/orbit-ssh-update.XXXXXX)"
+cleanup() {
+  hdiutil detach "$MOUNT_DIR" -quiet >/dev/null 2>&1 || true
+  rm -rf "$MOUNT_DIR"
+  rm -f "$0"
+}
+trap cleanup EXIT
+
+hdiutil attach "$DMG_PATH" -nobrowse -quiet -mountpoint "$MOUNT_DIR"
+SOURCE_APP="$MOUNT_DIR/$BUNDLE_NAME"
+if [ ! -d "$SOURCE_APP" ]; then
+  SOURCE_APP="$(find "$MOUNT_DIR" -maxdepth 1 -name "*.app" -type d -print -quit)"
+fi
+if [ -z "$SOURCE_APP" ] || [ ! -d "$SOURCE_APP" ]; then
+  echo "Updated app bundle was not found in DMG." >&2
+  exit 1
+fi
+
+for _ in {1..100}; do
+  if ! kill -0 "$OLD_PID" >/dev/null 2>&1; then
+    break
+  fi
+  sleep 0.15
+done
+
+mkdir -p "$(dirname "$TARGET_APP")"
+rm -rf "$TARGET_APP"
+/usr/bin/ditto "$SOURCE_APP" "$TARGET_APP"
+/usr/bin/xattr -dr com.apple.quarantine "$TARGET_APP" >/dev/null 2>&1 || true
+/usr/bin/open "$TARGET_APP"
+`,
+    { mode: 0o700 },
+  );
+  return scriptPath;
+}
+
+function installDmgUpdate(dmgPath) {
+  if (process.platform !== "darwin")
+    throw new Error(
+      mainText(
+        "자동 업데이트 설치는 macOS에서만 지원됩니다.",
+        "Automatic update installation is only supported on macOS.",
+      ),
+    );
+  const targetPath = targetUpdateAppPath();
+  const installerScript = createUpdateInstallerScript();
+  const child = spawn(
+    "/bin/bash",
+    [installerScript, dmgPath, targetPath, appBundleName, String(process.pid)],
+    {
+      detached: true,
+      stdio: "ignore",
+    },
+  );
+  child.unref();
+  setTimeout(() => app.quit(), 350);
+  return { path: dmgPath, targetPath, installing: true };
 }
 
 async function checkForUpdate(force = false) {
@@ -171,14 +262,24 @@ function downloadAvailableUpdate(sender) {
           reject(error);
           return;
         }
-        const openError = await shell.openPath(savePath);
         send("update:status", {
-          phase: "completed",
+          phase: "installing",
           percent: 100,
           path: savePath,
-          opened: !openError,
+          message: mainText(
+            "업데이트를 설치하고 앱을 다시 시작합니다.",
+            "Installing the update and restarting the app.",
+          ),
         });
-        resolve({ path: savePath, opened: !openError, openError });
+        try {
+          resolve(installDmgUpdate(savePath));
+        } catch (error) {
+          send("update:status", {
+            phase: "error",
+            message: error instanceof Error ? error.message : String(error),
+          });
+          reject(error);
+        }
       });
     };
     sender.session.on("will-download", onDownload);
