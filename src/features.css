@@ -168,11 +168,10 @@
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(4, 5, 8, 0.72);
+  background: transparent;
   display: grid;
   place-items: center;
   z-index: 20;
-  backdrop-filter: blur(4px);
 }
 .modal {
   width: 440px;

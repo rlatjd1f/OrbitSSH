@@ -985,6 +985,8 @@ app.whenReady().then(() => {
           const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms)); await wait(150);
           document.querySelector('[data-testid="new-folder"]').click(); await wait(20);
           const folderOpened=Boolean(document.querySelector('.modal'));
+          const backdropStyle=getComputedStyle(document.querySelector('.modal-backdrop'));
+          const modalBackdropClear=backdropStyle.backgroundColor==='rgba(0, 0, 0, 0)'&&(!backdropStyle.backdropFilter||backdropStyle.backdropFilter==='none');
           window.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape'})); await wait(20);
           const escapeClosed=!document.querySelector('.modal');
           document.querySelector('[data-testid="new-connection"]').click(); await wait(20);
@@ -1010,7 +1012,7 @@ app.whenReady().then(() => {
           const activeBefore=terminalTabs.findIndex(el=>el.classList.contains('active'));
           window.__preservedPane=document.querySelector('.terminal-pane.focused');
           window.__preservedText=window.__preservedPane?.textContent??'';
-          return {folderOpened,escapeClosed,passwordVisible,keyVisible,equipmentNameBlank,hostDefaultsToAny,userBlank,placeholderIsGray,equipmentLabel,duplicateTabsOpened,activeBefore};
+          return {folderOpened,modalBackdropClear,escapeClosed,passwordVisible,keyVisible,equipmentNameBlank,hostDefaultsToAny,userBlank,placeholderIsGray,equipmentLabel,duplicateTabsOpened,activeBefore};
         })()`);
         result.settingsShortcut =
           settingsCheck.settingsOpened && settingsCheck.settingsClosed;
@@ -1479,6 +1481,7 @@ app.whenReady().then(() => {
           result.heldCtrlCRepeated &&
           result.tabContentPreserved &&
           result.folderOpened &&
+          result.modalBackdropClear &&
           result.escapeClosed &&
           result.passwordVisible &&
           result.keyVisible &&
