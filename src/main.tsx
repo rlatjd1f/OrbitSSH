@@ -474,6 +474,23 @@ function App() {
       all.findIndex((item) => item.workspaceId === session.workspaceId) ===
       index,
   );
+  const sessionPickerHosts = store.groups.flatMap((group) =>
+    store.hosts
+      .filter((host) => host.groupId === group.id)
+      .map((host) => ({ host, group })),
+  );
+  const moveSessionPickerSelection = (direction: -1 | 1) => {
+    if (!sessionPickerHosts.length) return;
+    const index = sessionPickerHosts.findIndex(
+      ({ host }) => host.id === sessionPickerHostId,
+    );
+    const next =
+      sessionPickerHosts[
+        (index + direction + sessionPickerHosts.length) %
+          sessionPickerHosts.length
+      ];
+    setSessionPickerHostId(next.host.id);
+  };
 
   useEffect(() => {
     if (!window.desktop) return;
@@ -554,6 +571,17 @@ function App() {
     window.addEventListener("keydown", close, true);
     return () => window.removeEventListener("keydown", close, true);
   }, [dialog]);
+  useEffect(() => {
+    if (dialog !== "session" || !sessionPickerHostId) return;
+    const frame = requestAnimationFrame(() => {
+      const element = document.querySelector<HTMLButtonElement>(
+        `[data-session-host-id="${CSS.escape(sessionPickerHostId)}"]`,
+      );
+      element?.focus();
+      element?.scrollIntoView({ block: "nearest" });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [dialog, sessionPickerHostId]);
   const persist = async (next: ConnectionStore) => {
     const saved = await window.desktop!.store.save(next);
     setStore(saved);
@@ -564,7 +592,7 @@ function App() {
     setDialog("settings");
   };
   const openSessionPicker = () => {
-    const firstHost = store.hosts[0];
+    const firstHost = sessionPickerHosts[0]?.host ?? store.hosts[0];
     setSessionPickerHostId(firstHost?.id ?? "");
     setDialog("session");
   };
@@ -1246,14 +1274,14 @@ function App() {
                     aria-label={t("newSession")}
                   >
                     {store.groups.map((group) => {
-                      const hosts = store.hosts.filter(
-                        (host) => host.groupId === group.id,
+                      const hosts = sessionPickerHosts.filter(
+                        (item) => item.group.id === group.id,
                       );
                       if (!hosts.length) return null;
                       return (
                         <section key={group.id}>
                           <h3>{group.name}</h3>
-                          {hosts.map((host) => (
+                          {hosts.map(({ host }) => (
                             <button
                               key={host.id}
                               type="button"
@@ -1265,23 +1293,53 @@ function App() {
                                   : ""
                               }
                               data-testid="session-picker-host"
+                              data-session-host-id={host.id}
                               autoFocus={sessionPickerHostId === host.id}
+                              ref={(element) => {
+                                if (
+                                  element &&
+                                  sessionPickerHostId === host.id &&
+                                  document.activeElement?.closest(
+                                    ".session-picker",
+                                  )
+                                )
+                                  element.scrollIntoView({
+                                    block: "nearest",
+                                  });
+                              }}
                               onClick={() => setSessionPickerHostId(host.id)}
                               onDoubleClick={() => openPickedSession(host)}
                               onKeyDown={(event) => {
-                                if (event.key !== "Enter") return;
-                                event.preventDefault();
-                                openPickedSession(host);
+                                if (event.key === "Enter") {
+                                  event.preventDefault();
+                                  openPickedSession(host);
+                                  return;
+                                }
+                                if (
+                                  event.key === "ArrowDown" ||
+                                  event.key === "Down"
+                                ) {
+                                  event.preventDefault();
+                                  moveSessionPickerSelection(1);
+                                  return;
+                                }
+                                if (
+                                  event.key === "ArrowUp" ||
+                                  event.key === "Up"
+                                ) {
+                                  event.preventDefault();
+                                  moveSessionPickerSelection(-1);
+                                }
                               }}
                             >
                               <span className="status idle" />
                               <Server />
-                              <span>
+                              <span className="session-picker-name">
                                 <b>{host.name}</b>
-                                <small>
-                                  {host.user}@{host.host}:{host.port}
-                                </small>
                               </span>
+                              <small>
+                                {host.user}@{host.host}:{host.port}
+                              </small>
                             </button>
                           ))}
                         </section>

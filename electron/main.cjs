@@ -858,6 +858,16 @@ app.whenReady().then(() => {
           authType: "key",
           identityFile: "",
         },
+        {
+          id: "alpha-box",
+          name: "alpha-box",
+          host: "10.0.0.5",
+          user: "ops",
+          port: 2222,
+          groupId: "test-group",
+          authType: "key",
+          identityFile: "",
+        },
       ],
     });
     createWindow();
@@ -1379,7 +1389,39 @@ app.whenReady().then(() => {
         await openSessionPicker();
         const sessionPickerOpened =
           await mainWindow.webContents.executeJavaScript(
-            `(()=>document.querySelector('.session-picker h2')?.textContent==='새 세션'&&document.querySelectorAll('[data-testid="session-picker-host"]').length===1)()`,
+            `(()=>document.querySelector('.session-picker h2')?.textContent==='새 세션'&&document.querySelectorAll('[data-testid="session-picker-host"]').length===2)()`,
+          );
+        mainWindow.webContents.sendInputEvent({
+          type: "keyDown",
+          keyCode: "Down",
+        });
+        mainWindow.webContents.sendInputEvent({
+          type: "keyUp",
+          keyCode: "Down",
+        });
+        await new Promise((resolve) => setTimeout(resolve, 80));
+        const arrowDownSelected =
+          await mainWindow.webContents.executeJavaScript(
+            `(()=>document.querySelector('[data-testid="session-picker-host"].selected b')?.textContent==='alpha-box'&&document.activeElement?.dataset.sessionHostId==='alpha-box')()`,
+          );
+        mainWindow.webContents.sendInputEvent({
+          type: "keyDown",
+          keyCode: "Up",
+        });
+        mainWindow.webContents.sendInputEvent({
+          type: "keyUp",
+          keyCode: "Up",
+        });
+        await new Promise((resolve) => setTimeout(resolve, 80));
+        const arrowUpSelected =
+          await mainWindow.webContents.executeJavaScript(
+            `(()=>document.querySelector('[data-testid="session-picker-host"].selected b')?.textContent==='test-host'&&document.activeElement?.dataset.sessionHostId==='test-host')()`,
+          );
+        result.sessionPickerArrowNavigation =
+          arrowDownSelected && arrowUpSelected;
+        result.sessionPickerCompactRows =
+          await mainWindow.webContents.executeJavaScript(
+            `(()=>{const row=document.querySelector('[data-testid="session-picker-host"]');const name=row?.querySelector('b');const meta=row?.querySelector('small');if(!row||!name||!meta)return false;const rowStyle=getComputedStyle(row);const nameStyle=getComputedStyle(name);const metaStyle=getComputedStyle(meta);return parseFloat(rowStyle.height)<=40&&Math.abs(parseFloat(nameStyle.fontSize)-parseFloat(metaStyle.fontSize))<0.5&&Math.abs(name.getBoundingClientRect().top-meta.getBoundingClientRect().top)<2})()`,
           );
         const startsBeforeSessionButton = terminalStartCount;
         await mainWindow.webContents.executeJavaScript(
@@ -1461,6 +1503,8 @@ app.whenReady().then(() => {
           result.topTabRemainsAfterPaneClose &&
           result.ctrlTOpensDuplicateTab &&
           result.remappedCtrlTOpensDuplicateTab &&
+          result.sessionPickerArrowNavigation &&
+          result.sessionPickerCompactRows &&
           result.ctrlNOpenButtonStartsSession &&
           result.ctrlNEnterStartsSession &&
           result.ctrlNDoubleClickStartsSession;

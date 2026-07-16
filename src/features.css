@@ -378,8 +378,8 @@
 .session-picker-list {
   display: flex;
   flex-direction: column;
-  gap: 13px;
-  max-height: min(430px, calc(100vh - 230px));
+  gap: 10px;
+  max-height: min(520px, calc(100vh - 230px));
   overflow: auto;
   margin-top: 16px;
   padding-right: 4px;
@@ -387,7 +387,7 @@
 .session-picker-list section {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 .session-picker-list h3 {
   margin: 0 0 2px;
@@ -398,16 +398,16 @@
 }
 .session-picker-list button {
   width: 100%;
-  height: 52px;
+  height: 38px;
   border: 1px solid #303540;
-  border-radius: 8px;
+  border-radius: 7px;
   background: #12151b;
   color: #c9ced8;
   display: grid;
-  grid-template-columns: 7px 20px 1fr;
+  grid-template-columns: 7px 18px minmax(130px, 0.8fr) minmax(180px, 1fr);
   gap: 9px;
   align-items: center;
-  padding: 0 11px;
+  padding: 0 10px;
   text-align: left;
   cursor: pointer;
 }
@@ -423,11 +423,11 @@
   width: 16px;
   color: #81899b;
 }
-.session-picker-list button > span:last-child {
+.session-picker-name {
   min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .session-picker-list b {
   font-size: 12px;
@@ -435,8 +435,9 @@
   font-weight: 600;
 }
 .session-picker-list small {
-  font: 10px "JetBrains Mono";
-  color: #747c8c;
+  min-width: 0;
+  font: 600 12px "JetBrains Mono";
+  color: #a8afbf;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
