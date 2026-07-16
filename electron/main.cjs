@@ -997,7 +997,7 @@ app.whenReady().then(() => {
           const hostDefaultsToAny=connectionHost?.value==='0.0.0.0';
           const userBlank=connectionUser?.value==='';
           const placeholderColor=equipmentName?getComputedStyle(equipmentName,'::placeholder').color:'';
-          const placeholderIsGray=placeholderColor==='rgb(111, 118, 133)';
+          const placeholderIsGray=placeholderColor==='rgb(133, 141, 156)';
           const equipmentLabel=equipmentName?.closest('label')?.textContent.trim().startsWith('장비 이름');
           document.querySelector('input[value="password"]').click(); await wait(20);
           const passwordVisible=Boolean(document.querySelector('input[type="password"]'));
@@ -1056,6 +1056,29 @@ app.whenReady().then(() => {
         result.footerReadable = await mainWindow.webContents.executeJavaScript(
           `(()=>{const footer=document.querySelector('.workspace footer');if(!footer)return false;const style=getComputedStyle(footer);return parseFloat(style.fontSize)>=10&&style.color!=='rgb(97, 104, 119)'&&style.backgroundColor!=='rgb(18, 21, 27)'})()`,
         );
+        result.darkThemeContrastReadable =
+          await mainWindow.webContents.executeJavaScript(`(()=>{
+            const parse=color=>{const m=color.match(/rgba?\\((\\d+),\\s*(\\d+),\\s*(\\d+)(?:,\\s*([\\d.]+))?\\)/);return m?[Number(m[1]),Number(m[2]),Number(m[3]),m[4]===undefined?1:Number(m[4])]:null};
+            const lum=rgb=>{const [r,g,b]=rgb.map(v=>{v/=255;return v<=0.03928?v/12.92:Math.pow((v+0.055)/1.055,2.4)});return 0.2126*r+0.7152*g+0.0722*b};
+            const contrast=(fg,bg)=>(Math.max(lum(fg),lum(bg))+0.05)/(Math.min(lum(fg),lum(bg))+0.05);
+            const bgOf=el=>{let cur=el;while(cur){const bg=parse(getComputedStyle(cur).backgroundColor);if(bg&&bg[3]>0)return bg;cur=cur.parentElement}return [12,14,19,1]};
+            const checks=[
+              ['.section-title span',4.5],
+              ['.count',4.5],
+              ['.host-title small',4.5],
+              ['.session-bar p',4.5],
+              ['.pane-bar small',4.5],
+              ['.modal form > p',4.5],
+              ['.modal label span',4.5],
+              ['.auth-options small',4.5],
+              ['.settings-modal .settings-grid > label:not(.setting-toggle) > span',4.5],
+              ['.setting-toggle small',4.5],
+              ['.empty p',4.5],
+              ['.ready p',4.5]
+            ];
+            const failures=checks.flatMap(([selector,min])=>[...document.querySelectorAll(selector)].slice(0,2).map(el=>({selector,ratio:contrast(parse(getComputedStyle(el).color),bgOf(el))})).filter(item=>item.ratio<min));
+            return {passed:failures.length===0,failures};
+          })()`);
         await mainWindow.webContents.executeJavaScript(
           `(()=>document.querySelector('.terminal-pane.focused textarea')?.focus())()`,
         );
@@ -1474,6 +1497,7 @@ app.whenReady().then(() => {
           result.settingsSelectReadable &&
           result.settingsLabelsLarger &&
           result.footerReadable &&
+          result.darkThemeContrastReadable.passed &&
           result.enterReconnectsSamePane &&
           result.ctrlCSentToTerminal &&
           result.remappedCtrlCSentToTerminal &&

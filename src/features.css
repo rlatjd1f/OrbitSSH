@@ -71,7 +71,7 @@
 .no-connections {
   text-align: center;
   font-size: 11px;
-  color: #5d6370;
+  color: #858d9c;
   padding: 22px;
 }
 .connection-state {
@@ -142,7 +142,7 @@
 .ready {
   margin: auto;
   text-align: center;
-  color: #666d7b;
+  color: #858d9c;
 }
 .ready svg {
   width: 40px;
@@ -188,8 +188,8 @@
   color: #f0f2f7;
 }
 .modal form > p {
-  font-size: 11px;
-  color: #727988;
+  font-size: 12px;
+  color: #9aa2b3;
   margin: 0 0 22px;
 }
 .modal label {
@@ -203,7 +203,7 @@
 }
 .modal label span {
   font-weight: 400;
-  color: #585f6c;
+  color: #8d95a6;
 }
 .modal input,
 .modal select {
@@ -223,8 +223,8 @@
   background: #111319;
 }
 .modal input::placeholder {
-  color: #6f7685;
-  -webkit-text-fill-color: #6f7685;
+  color: #858d9c;
+  -webkit-text-fill-color: #858d9c;
   opacity: 1;
 }
 .modal input:focus,
@@ -356,8 +356,8 @@
   color: #d9dce5;
 }
 .auth-options small {
-  font-size: 9px;
-  color: #656c7a;
+  font-size: 10px;
+  color: #8d95a6;
   font-weight: 400;
 }
 .modal {
@@ -510,8 +510,8 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font: 8px "JetBrains Mono";
-  color: #59606c;
+  font: 10px "JetBrains Mono";
+  color: #8d95a6;
 }
 .pane-bar button {
   margin-left: auto;
@@ -519,7 +519,7 @@
   height: 20px;
   border: 0;
   background: transparent;
-  color: #616876;
+  color: #8d95a6;
   display: grid;
   place-items: center;
   border-radius: 4px;
@@ -598,7 +598,7 @@
 }
 .settings-modal .settings-grid > label:not(.setting-toggle) > span {
   font-size: 10px;
-  color: #777f8f;
+  color: #8d95a6;
 }
 .settings-modal .settings-grid input,
 .settings-modal .settings-grid select {
@@ -626,7 +626,7 @@
   font-size: 12px;
 }
 .setting-toggle small {
-  color: #777f8f;
+  color: #8d95a6;
   font-size: 10px;
   font-weight: 400;
 }
