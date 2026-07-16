@@ -1073,10 +1073,20 @@ app.whenReady().then(() => {
           const hostNameStyle=getComputedStyle(document.querySelector('.host-title .host-name'));
           const hostMetaStyle=getComputedStyle(document.querySelector('.host-title small'));
           const sidebarTreeStyled=groupStyle.backgroundColor!==hostStyle.backgroundColor&&hostNameStyle.color!==hostMetaStyle.color&&document.querySelector('.host-wrap')?.classList.length>=1;
+          const alphaHost=document.querySelector('[data-sidebar-host-id="alpha-box"]');
+          alphaHost.dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,clientX:180,clientY:250})); await wait(80);
+          const contextMenuOpened=Boolean(document.querySelector('[data-testid="sidebar-context-menu"]'));
+          document.querySelector('[data-testid="duplicate-session"]')?.click(); await wait(120);
+          const duplicatedHost=[...document.querySelectorAll('.host-row')].find(el=>el.textContent.includes('alpha-box (1)'));
+          const duplicateSessionCreated=Boolean(duplicatedHost)&&duplicatedHost?.dataset.sidebarHostId;
+          window.confirm=()=>true;
+          duplicatedHost?.dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,clientX:190,clientY:270})); await wait(80);
+          document.querySelector('[data-testid="delete-session"]')?.click(); await wait(160);
+          const duplicatedHostDeleted=![...document.querySelectorAll('.host-row')].some(el=>el.textContent.includes('alpha-box (1)'));
           terminalTabs[activeBefore]?.click(); await wait(80);
           window.__preservedPane=document.querySelector('.terminal-pane.focused');
           window.__preservedText=window.__preservedPane?.textContent??'';
-          return {folderOpened,modalBackdropClear,escapeClosed,passwordVisible,keyVisible,equipmentNameBlank,hostDefaultsToAny,userBlank,placeholderIsGray,equipmentLabel,duplicateTabsOpened,activeBefore,sidebarMovedDown,sidebarMovedUp,sidebarTreeStyled};
+          return {folderOpened,modalBackdropClear,escapeClosed,passwordVisible,keyVisible,equipmentNameBlank,hostDefaultsToAny,userBlank,placeholderIsGray,equipmentLabel,duplicateTabsOpened,activeBefore,sidebarMovedDown,sidebarMovedUp,sidebarTreeStyled,contextMenuOpened,duplicateSessionCreated,duplicatedHostDeleted};
         })()`);
         result.settingsShortcut =
           settingsCheck.settingsOpened && settingsCheck.settingsClosed;
@@ -1618,6 +1628,9 @@ app.whenReady().then(() => {
           result.sidebarMovedDown &&
           result.sidebarMovedUp &&
           result.sidebarTreeStyled &&
+          result.contextMenuOpened &&
+          result.duplicateSessionCreated &&
+          result.duplicatedHostDeleted &&
           result.modalBackdropClear &&
           result.escapeClosed &&
           result.passwordVisible &&

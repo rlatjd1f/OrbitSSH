@@ -38,6 +38,7 @@ type Session = {
   sessionId?: string;
   state: SessionState;
 };
+type SidebarMenu = { hostId: string; x: number; y: number } | null;
 const emptyStore: ConnectionStore = { groups: [], hosts: [] };
 const defaultSettings: AppSettings = {
   language: "ko",
@@ -428,6 +429,7 @@ function App() {
     "host" | "group" | "settings" | "session" | null
   >(null);
   const [sessionPickerHostId, setSessionPickerHostId] = useState("");
+  const [sidebarMenu, setSidebarMenu] = useState<SidebarMenu>(null);
   const [editing, setEditing] = useState<ConnectionHost | null>(null);
   const [settings, setSettings] = useState<AppSettings>(defaultSettings);
   const [settingsDraft, setSettingsDraft] =
@@ -582,6 +584,19 @@ function App() {
     });
     return () => cancelAnimationFrame(frame);
   }, [dialog, sessionPickerHostId]);
+  useEffect(() => {
+    if (!sidebarMenu) return;
+    const close = () => setSidebarMenu(null);
+    const closeWithEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") close();
+    };
+    window.addEventListener("mousedown", close);
+    window.addEventListener("keydown", closeWithEscape);
+    return () => {
+      window.removeEventListener("mousedown", close);
+      window.removeEventListener("keydown", closeWithEscape);
+    };
+  }, [sidebarMenu]);
   const persist = async (next: ConnectionStore) => {
     const saved = await window.desktop!.store.save(next);
     setStore(saved);
@@ -692,6 +707,32 @@ function App() {
       ...store,
       hosts: store.hosts.filter((h) => h.id !== host.id),
     });
+  };
+  const uniqueDuplicatedHostName = (name: string) => {
+    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const pattern = new RegExp(`^${escaped} \\((\\d+)\\)$`);
+    const used = new Set(
+      store.hosts
+        .map((host) => {
+          if (host.name === name) return 0;
+          const match = host.name.match(pattern);
+          return match ? Number(match[1]) : null;
+        })
+        .filter((value): value is number => value !== null),
+    );
+    let index = 1;
+    while (used.has(index)) index += 1;
+    return `${name} (${index})`;
+  };
+  const duplicateHost = async (host: ConnectionHost) => {
+    const duplicated: ConnectionHost = {
+      ...host,
+      id: crypto.randomUUID(),
+      name: uniqueDuplicatedHostName(host.name),
+    };
+    await persist({ ...store, hosts: [...store.hosts, duplicated] });
+    setExpanded((current) => new Set(current).add(duplicated.groupId));
+    setSelectedHostId(duplicated.id);
   };
   const removeGroup = async (group: ConnectionGroup) => {
     if (store.hosts.some((h) => h.groupId === group.id)) {
@@ -1085,6 +1126,16 @@ function App() {
                       <button
                         className={`tree-row host-row ${selectedHostId === h.id ? "selected" : ""}`}
                         data-sidebar-host-id={h.id}
+                        onContextMenu={(event) => {
+                          event.preventDefault();
+                          setSelectedHostId(h.id);
+                          setActiveTabId("");
+                          setSidebarMenu({
+                            hostId: h.id,
+                            x: event.clientX,
+                            y: event.clientY,
+                          });
+                        }}
                         onDoubleClick={() => connect(h)}
                         onClick={() => {
                           setSelectedHostId(h.id);
@@ -1118,6 +1169,41 @@ function App() {
           <Plus /> {t("addConnection")}
         </button>
       </aside>
+      {sidebarMenu &&
+        (() => {
+          const host = store.hosts.find((item) => item.id === sidebarMenu.hostId);
+          if (!host) return null;
+          return (
+            <div
+              className="context-menu"
+              data-testid="sidebar-context-menu"
+              style={{ left: sidebarMenu.x, top: sidebarMenu.y }}
+              onMouseDown={(event) => event.stopPropagation()}
+            >
+              <button
+                type="button"
+                data-testid="duplicate-session"
+                onClick={() => {
+                  setSidebarMenu(null);
+                  void duplicateHost(host);
+                }}
+              >
+                <Plus /> {t("duplicateSession")}
+              </button>
+              <button
+                type="button"
+                className="danger"
+                data-testid="delete-session"
+                onClick={() => {
+                  setSidebarMenu(null);
+                  void removeHost(host);
+                }}
+              >
+                <Trash2 /> {t("deleteSession")}
+              </button>
+            </div>
+          );
+        })()}
       <main className="workspace">
         <div className="tabs">
           {workspaceTabs.map((s) => {
