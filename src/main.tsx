@@ -145,10 +145,12 @@ function TerminalPane({
       }
       return true;
     });
-    const activate = () =>
+    const activate = () => {
+      void window.desktop?.inputSource.useEnglish();
       window.desktop?.terminal.setActive(
         sessionRef.current.sessionId ?? null,
       );
+    };
     ref.current.addEventListener("pointerdown", activate);
     const selection = term.onSelectionChange(() => {
       const value = term.getSelection();
@@ -207,6 +209,7 @@ function TerminalPane({
       term.writeln(`\x1b[90m${translate(languageRef.current, "connecting")}\x1b[0m`);
     else {
       onResize();
+      void window.desktop?.inputSource.useEnglish();
       term.focus();
     }
     return () => {
@@ -233,6 +236,7 @@ function TerminalPane({
   useEffect(() => {
     if (active) {
       activeTerminalInstance = terminalRef.current;
+      void window.desktop?.inputSource.useEnglish();
       window.desktop?.terminal.setActive(session.sessionId ?? null);
       const focusFrame = requestAnimationFrame(() => {
         terminalRef.current?.focus();
@@ -245,6 +249,7 @@ function TerminalPane({
   useEffect(() => {
     const term = terminalRef.current;
     if (!term || !session.sessionId) return;
+    void window.desktop?.inputSource.useEnglish();
     term.focus();
     window.desktop?.terminal.resize(session.sessionId, term.cols, term.rows);
   }, [session.sessionId]);

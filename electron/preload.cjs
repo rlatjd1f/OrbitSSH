@@ -25,6 +25,9 @@ contextBridge.exposeInMainWorld("desktop", {
     load: () => ipcRenderer.invoke("settings:load"),
     save: (value) => ipcRenderer.invoke("settings:save", value),
   },
+  inputSource: {
+    useEnglish: () => ipcRenderer.invoke("input-source:english"),
+  },
   terminal: {
     start: (host) => ipcRenderer.invoke("terminal:start", host),
     startLocal: () => ipcRenderer.invoke("terminal:start-local"),

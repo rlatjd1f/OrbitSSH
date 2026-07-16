@@ -68,6 +68,9 @@ interface Window {
       load(): Promise<AppSettings>;
       save(value: AppSettings): Promise<AppSettings>;
     };
+    inputSource: {
+      useEnglish(): Promise<boolean>;
+    };
     terminal: {
       start(host: ConnectionHost): Promise<string>;
       startLocal(): Promise<string>;

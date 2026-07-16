@@ -10,7 +10,7 @@ const {
 const path = require("node:path");
 const fs = require("node:fs");
 const crypto = require("node:crypto");
-const { execFileSync } = require("node:child_process");
+const { execFile, execFileSync } = require("node:child_process");
 const pty = require("node-pty");
 
 const isDev = !app.isPackaged;
@@ -19,6 +19,7 @@ let mainWindow;
 let lastTerminalWrite;
 let terminalStartCount = 0;
 let terminalInterruptCount = 0;
+let inputSourceSwitchCount = 0;
 let activeTerminalSessionId = null;
 let physicalControlDown = false;
 let lastPhysicalControlUpAt = 0;
@@ -434,6 +435,24 @@ function writeToTerminal(sessionId, data) {
   }
 }
 
+function switchToEnglishInputSource() {
+  if (process.platform !== "darwin") return Promise.resolve(false);
+  inputSourceSwitchCount += 1;
+  return new Promise((resolve) => {
+    execFile(
+      "/usr/bin/osascript",
+      [
+        "-l",
+        "JavaScript",
+        "-e",
+        'ObjC.import("Carbon"); const source=$.TISCopyInputSourceForLanguage("en"); $.TISSelectInputSource(source);',
+      ],
+      { timeout: 2000 },
+      (error) => resolve(!error),
+    );
+  });
+}
+
 function resizeTerminal(sessionId, cols, rows) {
   if (!sessionId || cols <= 0 || rows <= 0) return;
   const proc = sessions.get(sessionId);
@@ -607,6 +626,7 @@ function registerIpc() {
   });
   ipcMain.handle("terminal:start", (_event, host) => startSession(host));
   ipcMain.handle("terminal:start-local", () => startLocalSession());
+  ipcMain.handle("input-source:english", () => switchToEnglishInputSource());
   ipcMain.on("terminal:write", (_event, { sessionId, data }) => {
     if (process.env.ORBIT_UI_SELF_TEST === "1")
       lastTerminalWrite = { sessionId, data };
@@ -1134,6 +1154,7 @@ app.whenReady().then(() => {
         result.englishConnectionUi = settingsCheck.englishConnectionUi;
         result.defaultLocalSessionOpened =
           settingsCheck.defaultLocalSessionOpened;
+        result.defaultTerminalInputEnglish = inputSourceSwitchCount > 0;
         result.englishMenu =
           englishMenuLabels?.includes("Terminal") &&
           englishMenuLabels?.includes("Edit") &&
@@ -1645,6 +1666,7 @@ app.whenReady().then(() => {
           result.englishAppUi &&
           result.englishConnectionUi &&
           result.defaultLocalSessionOpened &&
+          result.defaultTerminalInputEnglish &&
           result.englishMenu &&
           result.koreanLanguageRestored &&
           result.koreanMenu &&
