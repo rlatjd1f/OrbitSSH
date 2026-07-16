@@ -20,6 +20,7 @@ let lastTerminalWrite;
 let terminalStartCount = 0;
 let terminalInterruptCount = 0;
 let inputSourceSwitchCount = 0;
+let inputSourceSwitchSuccessCount = 0;
 let activeTerminalSessionId = null;
 let physicalControlDown = false;
 let lastPhysicalControlUpAt = 0;
@@ -438,7 +439,25 @@ function writeToTerminal(sessionId, data) {
 function switchToEnglishInputSource() {
   if (process.platform !== "darwin") return Promise.resolve(false);
   inputSourceSwitchCount += 1;
+  const helperPath = app.isPackaged
+    ? path.join(
+        process.resourcesPath,
+        "app.asar.unpacked",
+        "electron",
+        "helpers",
+        "bin",
+        "InputSourceSwitcher",
+      )
+    : path.join(__dirname, "helpers", "bin", "InputSourceSwitcher");
   return new Promise((resolve) => {
+    const done = (success) => {
+      if (success) inputSourceSwitchSuccessCount += 1;
+      resolve(success);
+    };
+    if (fs.existsSync(helperPath)) {
+      execFile(helperPath, { timeout: 2000 }, (error) => done(!error));
+      return;
+    }
     execFile(
       "/usr/bin/osascript",
       [
@@ -448,7 +467,7 @@ function switchToEnglishInputSource() {
         'ObjC.import("Carbon"); const source=$.TISCopyInputSourceForLanguage("en"); $.TISSelectInputSource(source);',
       ],
       { timeout: 2000 },
-      (error) => resolve(!error),
+      (error) => done(!error),
     );
   });
 }
@@ -1154,7 +1173,8 @@ app.whenReady().then(() => {
         result.englishConnectionUi = settingsCheck.englishConnectionUi;
         result.defaultLocalSessionOpened =
           settingsCheck.defaultLocalSessionOpened;
-        result.defaultTerminalInputEnglish = inputSourceSwitchCount > 0;
+        result.defaultTerminalInputEnglish =
+          inputSourceSwitchCount > 0 && inputSourceSwitchSuccessCount > 0;
         result.englishMenu =
           englishMenuLabels?.includes("Terminal") &&
           englishMenuLabels?.includes("Edit") &&
