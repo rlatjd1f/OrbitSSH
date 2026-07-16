@@ -898,6 +898,44 @@
   border-color: #50478d;
   background: #181628;
 }
+.update-check-modal {
+  width: min(460px, calc(100vw - 32px));
+}
+.update-check-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.update-check-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding-right: 28px;
+}
+.update-check-heading h2 {
+  margin: 0 0 5px;
+}
+.update-check-heading p {
+  margin: 0 0 4px;
+  color: #99a1b1;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.update-check-icon {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: #282343;
+  color: #8d7fff;
+  box-shadow: inset 0 0 0 1px rgba(141, 127, 255, 0.18);
+}
+.update-check-icon svg {
+  width: 20px;
+  height: 20px;
+}
 .update-actions button.primary {
   border-color: #6c5ce7;
   background: #6c5ce7;

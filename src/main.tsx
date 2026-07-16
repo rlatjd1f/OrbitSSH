@@ -618,6 +618,148 @@ function SettingsForm({
   );
 }
 
+function UpdateCheckDialog({
+  language,
+  appVersion,
+  architecture,
+  updateInfo,
+  updateStatus,
+  updateError,
+  onCheckUpdates,
+  onDownloadUpdate,
+  onOpenRelease,
+}: {
+  language: AppLanguage;
+  appVersion: string;
+  architecture: string;
+  updateInfo: UpdateInfo | null;
+  updateStatus: UpdateStatus;
+  updateError: string;
+  onCheckUpdates: () => void;
+  onDownloadUpdate: () => void;
+  onOpenRelease: () => void;
+}) {
+  const t = (key: MessageKey, values?: Record<string, string | number>) =>
+    translate(language, key, values);
+  const isChecking = updateStatus.phase === "checking";
+  const isDownloading = updateStatus.phase === "downloading";
+  const isInstalling = updateStatus.phase === "installing";
+  const isUpdateBusy = isDownloading || isInstalling;
+  const downloadPercent = Math.max(
+    0,
+    Math.min(100, Math.round(updateStatus.percent ?? 0)),
+  );
+  const hasDownloadTotal = Boolean(updateStatus.total && updateStatus.total > 0);
+  const architectureLabel =
+    architecture === "arm64"
+      ? "Apple Silicon"
+      : architecture === "x64"
+        ? "Intel Mac"
+        : architecture;
+
+  return (
+    <div className="update-check-dialog" data-testid="update-check-dialog">
+      <div className="update-check-heading">
+        <span className="update-check-icon">
+          <Download />
+        </span>
+        <div>
+          <h2>{t("updateCheckTitle")}</h2>
+          <p>{t("updateCheckDescription")}</p>
+        </div>
+      </div>
+      <div className="update-card">
+        <div>
+          <b>Orbit SSH v{appVersion || "-"}</b>
+          <small>
+            {t("installedVersion", {
+              architecture: architectureLabel,
+            })}
+          </small>
+        </div>
+        <button
+          type="button"
+          aria-label={t("checkUpdate")}
+          onClick={onCheckUpdates}
+          disabled={isChecking || isUpdateBusy}
+        >
+          <RotateCw className={isChecking ? "spinning" : ""} />
+          {isChecking ? t("checking") : t("checkUpdate")}
+        </button>
+      </div>
+      {updateInfo?.updateAvailable ? (
+        <div className="update-result available">
+          <div>
+            <b>
+              {t("updateAvailable", {
+                version: updateInfo.latestVersion,
+              })}
+            </b>
+            <small>
+              {updateInfo.assetName
+                ? t("compatibleDmg", { architecture: architectureLabel })
+                : t("noCompatibleDmg")}
+            </small>
+          </div>
+          <div className="update-actions">
+            <button type="button" onClick={onOpenRelease}>
+              <ExternalLink /> {t("releaseNotes")}
+            </button>
+            <button
+              type="button"
+              className="primary"
+              onClick={onDownloadUpdate}
+              disabled={!updateInfo.assetName || isUpdateBusy}
+            >
+              <Download />{" "}
+              {isInstalling
+                ? t("installingUpdate")
+                : isDownloading
+                  ? t("downloadingUpdate")
+                  : t("downloadDmg")}
+            </button>
+          </div>
+        </div>
+      ) : updateInfo ? (
+        <p className="update-message">{t("latestVersion")}</p>
+      ) : isChecking ? (
+        <p className="update-message">{t("checking")}</p>
+      ) : null}
+      {isDownloading && (
+        <div className="update-progress-card" data-testid="update-progress-card">
+          <div className="update-progress-header">
+            <b>{t("downloadingUpdate")}</b>
+            <span>{downloadPercent}%</span>
+          </div>
+          <div
+            className={`update-progress ${hasDownloadTotal ? "" : "indeterminate"}`}
+            aria-label={t("downloadProgress")}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={downloadPercent}
+            role="progressbar"
+          >
+            <span
+              style={{
+                width: hasDownloadTotal ? `${downloadPercent}%` : "42%",
+              }}
+            />
+          </div>
+        </div>
+      )}
+      {isInstalling && (
+        <p className="update-message success">
+          {updateStatus.message || t("dmgOpened")}
+        </p>
+      )}
+      {updateStatus.phase === "completed" && (
+        <p className="update-message success">{t("dmgOpened")}</p>
+      )}
+      {updateError && <p className="update-message error">{updateError}</p>}
+    </div>
+  );
+}
+
 function App() {
   const [store, setStore] = useState<ConnectionStore>(emptyStore);
   const [loaded, setLoaded] = useState(false);
@@ -627,7 +769,7 @@ function App() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [query, setQuery] = useState("");
   const [dialog, setDialog] = useState<
-    "host" | "group" | "settings" | "session" | null
+    "host" | "group" | "settings" | "session" | "update-check" | null
   >(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [sessionPickerHostId, setSessionPickerHostId] = useState("");
@@ -1194,7 +1336,7 @@ function App() {
           return;
         }
         if (action === "check-updates") {
-          openSettings();
+          setDialog("update-check");
           void checkUpdates();
           return;
         }
@@ -1746,7 +1888,11 @@ function App() {
             if (e.target === e.currentTarget) setDialog(null);
           }}
         >
-          <div className={`modal ${dialog === "settings" ? "settings-modal" : ""}`}>
+          <div
+            className={`modal ${dialog === "settings" ? "settings-modal" : ""} ${
+              dialog === "update-check" ? "update-check-modal" : ""
+            }`}
+          >
             <button
               className="modal-close"
               aria-label={t("close")}
@@ -1765,6 +1911,18 @@ function App() {
                 onChange={setSettingsDraft}
                 onSubmit={submitSettings}
                 onCancel={() => setDialog(null)}
+                onCheckUpdates={() => void checkUpdates()}
+                onDownloadUpdate={() => void downloadUpdate()}
+                onOpenRelease={() => void window.desktop?.updates.openRelease()}
+              />
+            ) : dialog === "update-check" ? (
+              <UpdateCheckDialog
+                language={language}
+                appVersion={appVersion}
+                architecture={window.desktop.architecture}
+                updateInfo={updateInfo}
+                updateStatus={updateStatus}
+                updateError={updateError}
                 onCheckUpdates={() => void checkUpdates()}
                 onDownloadUpdate={() => void downloadUpdate()}
                 onOpenRelease={() => void window.desktop?.updates.openRelease()}

@@ -1216,6 +1216,20 @@ app.whenReady().then(() => {
             ...(item.submenu?.items.map((child) => child.label) ?? []),
           ],
         );
+        mainWindow.webContents.send("shortcut:action", "check-updates");
+        await new Promise((resolve) => setTimeout(resolve, 180));
+        const updateCheckDialog = await mainWindow.webContents.executeJavaScript(
+          `Boolean(document.querySelector('[data-testid="update-check-dialog"]')&&!document.querySelector('.settings-modal'))`,
+        );
+        mainWindow.webContents.sendInputEvent({
+          type: "keyDown",
+          keyCode: "Escape",
+        });
+        mainWindow.webContents.sendInputEvent({
+          type: "keyUp",
+          keyCode: "Escape",
+        });
+        await new Promise((resolve) => setTimeout(resolve, 80));
         mainWindow.webContents.sendInputEvent({
           type: "keyDown",
           keyCode: ",",
@@ -1338,6 +1352,7 @@ app.whenReady().then(() => {
           koreanMenuLabels?.includes("업데이트 확인…") &&
           koreanMenuLabels?.includes("작업 중단") &&
           koreanMenuLabels?.includes("복사");
+        result.updateCheckDialog = updateCheckDialog;
         result.appVersionVisible = settingsCheck.appVersionVisible;
         result.updateAvailableVisible = settingsCheck.updateAvailableVisible;
         result.settingsEscapeClosed = settingsEscapeClosed;
@@ -1836,6 +1851,7 @@ app.whenReady().then(() => {
           result.englishMenu &&
           result.koreanLanguageRestored &&
           result.koreanMenu &&
+          result.updateCheckDialog &&
           result.appVersionVisible &&
           result.updateAvailableVisible &&
           result.settingsEscapeClosed &&
