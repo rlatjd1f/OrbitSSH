@@ -287,145 +287,300 @@ function SettingsForm({
   onOpenRelease: () => void;
 }) {
   const language = value.language;
+  const [activeSection, setActiveSection] = useState<
+    "general" | "terminal" | "defaults" | "ssh" | "updates"
+  >("general");
   const t = (key: MessageKey, values?: Record<string, string | number>) =>
     translate(language, key, values);
   const update = <K extends keyof AppSettings>(key: K, next: AppSettings[K]) =>
     onChange({ ...value, [key]: next });
+  const sectionButtons = [
+    { id: "general", label: t("general"), icon: Settings },
+    { id: "terminal", label: t("terminal"), icon: TerminalSquare },
+    { id: "defaults", label: t("connectionDefaults"), icon: Server },
+    { id: "ssh", label: t("sshConnection"), icon: LockKeyhole },
+    { id: "updates", label: t("appUpdate"), icon: Download },
+  ] as const;
   return (
     <form onSubmit={onSubmit}>
       <h2>{t("settings")}</h2>
       <p>{t("settingsDescription")}</p>
-      <section className="settings-section">
-        <h3>{t("general")}</h3>
-        <div className="settings-grid">
-          <label className="settings-wide">
-            {t("language")}
-            <select
-              data-testid="language-select"
-              aria-label={t("language")}
-              value={value.language}
-              onChange={(event) =>
-                update("language", event.target.value as AppLanguage)
-              }
+      <div className="settings-layout">
+        <aside className="settings-nav" aria-label={t("settings")}>
+          {sectionButtons.map(({ id, label, icon: Icon }) => (
+            <button
+              key={id}
+              type="button"
+              className={activeSection === id ? "active" : ""}
+              data-testid={`settings-nav-${id}`}
+              onClick={() => setActiveSection(id)}
             >
-              <option value="ko">{t("korean")}</option>
-              <option value="en">{t("english")}</option>
-            </select>
-          </label>
-        </div>
-      </section>
-      <section className="settings-section">
-        <h3>{t("terminal")}</h3>
-        <div className="settings-grid">
-          <label className="settings-wide">
-            {t("terminalFont")}
-            <select
-              data-testid="terminal-font"
-              aria-label={t("terminalFont")}
-              value={value.terminalFontFamily}
-              onChange={(event) =>
-                update("terminalFontFamily", event.target.value)
-              }
-              style={{ fontFamily: value.terminalFontFamily }}
-            >
-              {!terminalFonts.some(([, font]) => font === value.terminalFontFamily) && (
-                <option value={value.terminalFontFamily}>{t("currentSetting")}</option>
+              <Icon />
+              <span>{label}</span>
+            </button>
+          ))}
+        </aside>
+        <div className="settings-content">
+          {activeSection === "general" && (
+            <section className="settings-section">
+              <h3>{t("general")}</h3>
+              <div className="settings-grid">
+                <label className="settings-wide">
+                  {t("language")}
+                  <select
+                    data-testid="language-select"
+                    aria-label={t("language")}
+                    value={value.language}
+                    onChange={(event) =>
+                      update("language", event.target.value as AppLanguage)
+                    }
+                  >
+                    <option value="ko">{t("korean")}</option>
+                    <option value="en">{t("english")}</option>
+                  </select>
+                </label>
+              </div>
+            </section>
+          )}
+          {activeSection === "terminal" && (
+            <section className="settings-section">
+              <h3>{t("terminal")}</h3>
+              <div className="settings-grid">
+                <label className="settings-wide">
+                  {t("terminalFont")}
+                  <select
+                    data-testid="terminal-font"
+                    aria-label={t("terminalFont")}
+                    value={value.terminalFontFamily}
+                    onChange={(event) =>
+                      update("terminalFontFamily", event.target.value)
+                    }
+                    style={{ fontFamily: value.terminalFontFamily }}
+                  >
+                    {!terminalFonts.some(
+                      ([, font]) => font === value.terminalFontFamily,
+                    ) && (
+                      <option value={value.terminalFontFamily}>
+                        {t("currentSetting")}
+                      </option>
+                    )}
+                    {terminalFonts.map(([label, font]) => (
+                      <option key={label} value={font}>
+                        {label === "system" ? t("systemMonospace") : label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  {t("fontSize")}
+                  <input
+                    data-testid="terminal-font-size"
+                    aria-label={t("fontSize")}
+                    type="number"
+                    min="9"
+                    max="24"
+                    value={value.terminalFontSize}
+                    onChange={(e) =>
+                      update("terminalFontSize", Number(e.target.value))
+                    }
+                  />
+                </label>
+                <label>
+                  {t("lineHeight")}
+                  <select
+                    data-testid="terminal-line-height"
+                    aria-label={t("lineHeight")}
+                    value={value.terminalLineHeight}
+                    onChange={(e) =>
+                      update("terminalLineHeight", Number(e.target.value))
+                    }
+                  >
+                    <option value="1.2">{t("compact")}</option>
+                    <option value="1.45">{t("normal")}</option>
+                    <option value="1.7">{t("spacious")}</option>
+                  </select>
+                </label>
+                <label>
+                  {t("scrollback")}
+                  <input
+                    data-testid="terminal-scrollback"
+                    aria-label={t("scrollback")}
+                    type="number"
+                    min="1000"
+                    max="50000"
+                    step="1000"
+                    value={value.scrollback}
+                    onChange={(e) => update("scrollback", Number(e.target.value))}
+                  />
+                </label>
+                <label className="setting-toggle">
+                  <span>
+                    <b>{t("cursorBlink")}</b>
+                    <small>{t("cursorBlinkDescription")}</small>
+                  </span>
+                  <input
+                    aria-label={t("cursorBlink")}
+                    type="checkbox"
+                    checked={value.cursorBlink}
+                    onChange={(e) => update("cursorBlink", e.target.checked)}
+                  />
+                </label>
+              </div>
+            </section>
+          )}
+          {activeSection === "defaults" && (
+            <section className="settings-section">
+              <h3>{t("connectionDefaults")}</h3>
+              <div className="settings-grid">
+                <label>
+                  {t("defaultUser")}
+                  <input
+                    data-testid="default-user"
+                    aria-label={t("defaultUser")}
+                    value={value.defaultUser}
+                    onChange={(e) => update("defaultUser", e.target.value)}
+                    placeholder="ubuntu"
+                  />
+                </label>
+                <label>
+                  {t("defaultPort")}
+                  <input
+                    aria-label={t("defaultPort")}
+                    type="number"
+                    min="1"
+                    max="65535"
+                    value={value.defaultPort}
+                    onChange={(e) => update("defaultPort", Number(e.target.value))}
+                  />
+                </label>
+                <label>
+                  {t("defaultAuth")}
+                  <select
+                    aria-label={t("defaultAuth")}
+                    value={value.defaultAuthType}
+                    onChange={(e) =>
+                      update(
+                        "defaultAuthType",
+                        e.target.value as "password" | "key",
+                      )
+                    }
+                  >
+                    <option value="key">{t("sshKey")}</option>
+                    <option value="password">{t("password")}</option>
+                  </select>
+                </label>
+              </div>
+            </section>
+          )}
+          {activeSection === "ssh" && (
+            <section className="settings-section">
+              <h3>{t("sshConnection")}</h3>
+              <div className="settings-grid">
+                <label>
+                  {t("keepAlive")}
+                  <input
+                    aria-label={t("keepAlive")}
+                    type="number"
+                    min="0"
+                    max="600"
+                    value={value.keepAliveInterval}
+                    onChange={(e) =>
+                      update("keepAliveInterval", Number(e.target.value))
+                    }
+                  />
+                </label>
+              </div>
+            </section>
+          )}
+          {activeSection === "updates" && (
+            <section className="settings-section update-section">
+              <h3>{t("appUpdate")}</h3>
+              <div className="update-card">
+                <div>
+                  <b data-testid="app-version">Orbit SSH v{appVersion || "-"}</b>
+                  <small>
+                    {t("installedVersion", {
+                      architecture:
+                        architecture === "arm64"
+                          ? "Apple Silicon"
+                          : architecture === "x64"
+                            ? "Intel Mac"
+                            : architecture,
+                    })}
+                  </small>
+                </div>
+                <button
+                  type="button"
+                  aria-label={t("checkUpdate")}
+                  onClick={onCheckUpdates}
+                  disabled={
+                    updateStatus.phase === "checking" ||
+                    updateStatus.phase === "downloading"
+                  }
+                >
+                  <RotateCw
+                    className={updateStatus.phase === "checking" ? "spinning" : ""}
+                  />
+                  {updateStatus.phase === "checking"
+                    ? t("checking")
+                    : t("checkUpdate")}
+                </button>
+              </div>
+              {updateInfo?.updateAvailable ? (
+                <div className="update-result available">
+                  <div>
+                    <b>
+                      {t("updateAvailable", {
+                        version: updateInfo.latestVersion,
+                      })}
+                    </b>
+                    <small>
+                      {updateInfo.assetName
+                        ? t("compatibleDmg", {
+                            architecture:
+                              architecture === "arm64"
+                                ? "Apple Silicon"
+                                : "Intel Mac",
+                          })
+                        : t("noCompatibleDmg")}
+                    </small>
+                  </div>
+                  <div className="update-actions">
+                    <button type="button" onClick={onOpenRelease}>
+                      <ExternalLink /> {t("releaseNotes")}
+                    </button>
+                    <button
+                      type="button"
+                      className="primary"
+                      onClick={onDownloadUpdate}
+                      disabled={
+                        !updateInfo.assetName ||
+                        updateStatus.phase === "downloading"
+                      }
+                    >
+                      <Download />{" "}
+                      {updateStatus.phase === "downloading"
+                        ? `${updateStatus.percent ?? 0}%`
+                        : t("downloadDmg")}
+                    </button>
+                  </div>
+                </div>
+              ) : updateInfo ? (
+                <p className="update-message">{t("latestVersion")}</p>
+              ) : null}
+              {updateStatus.phase === "downloading" && (
+                <div className="update-progress" aria-label={t("downloadProgress")}>
+                  <span style={{ width: `${updateStatus.percent ?? 0}%` }} />
+                </div>
               )}
-              {terminalFonts.map(([label, font]) => (
-                <option key={label} value={font}>{label === "system" ? t("systemMonospace") : label}</option>
-              ))}
-            </select>
-          </label>
-          <label>
-            {t("fontSize")}
-            <input data-testid="terminal-font-size" aria-label={t("fontSize")} type="number" min="9" max="24" value={value.terminalFontSize} onChange={(e) => update("terminalFontSize", Number(e.target.value))} />
-          </label>
-          <label>
-            {t("lineHeight")}
-            <select data-testid="terminal-line-height" aria-label={t("lineHeight")} value={value.terminalLineHeight} onChange={(e) => update("terminalLineHeight", Number(e.target.value))}>
-              <option value="1.2">{t("compact")}</option><option value="1.45">{t("normal")}</option><option value="1.7">{t("spacious")}</option>
-            </select>
-          </label>
-          <label>
-            {t("scrollback")}
-            <input data-testid="terminal-scrollback" aria-label={t("scrollback")} type="number" min="1000" max="50000" step="1000" value={value.scrollback} onChange={(e) => update("scrollback", Number(e.target.value))} />
-          </label>
-          <label className="setting-toggle">
-            <span><b>{t("cursorBlink")}</b><small>{t("cursorBlinkDescription")}</small></span>
-            <input aria-label={t("cursorBlink")} type="checkbox" checked={value.cursorBlink} onChange={(e) => update("cursorBlink", e.target.checked)} />
-          </label>
+              {updateStatus.phase === "completed" && (
+                <p className="update-message success">{t("dmgOpened")}</p>
+              )}
+              {updateError && <p className="update-message error">{updateError}</p>}
+            </section>
+          )}
         </div>
-      </section>
-      <section className="settings-section">
-        <h3>{t("connectionDefaults")}</h3>
-        <div className="settings-grid">
-          <label>{t("defaultUser")}<input data-testid="default-user" aria-label={t("defaultUser")} value={value.defaultUser} onChange={(e) => update("defaultUser", e.target.value)} placeholder="ubuntu" /></label>
-          <label>{t("defaultPort")}<input aria-label={t("defaultPort")} type="number" min="1" max="65535" value={value.defaultPort} onChange={(e) => update("defaultPort", Number(e.target.value))} /></label>
-          <label>{t("defaultAuth")}<select aria-label={t("defaultAuth")} value={value.defaultAuthType} onChange={(e) => update("defaultAuthType", e.target.value as "password" | "key")}><option value="key">{t("sshKey")}</option><option value="password">{t("password")}</option></select></label>
-        </div>
-      </section>
-      <section className="settings-section">
-        <h3>{t("sshConnection")}</h3>
-        <div className="settings-grid">
-          <label>{t("keepAlive")}<input aria-label={t("keepAlive")} type="number" min="0" max="600" value={value.keepAliveInterval} onChange={(e) => update("keepAliveInterval", Number(e.target.value))} /></label>
-        </div>
-      </section>
-      <section className="settings-section update-section">
-        <h3>{t("appUpdate")}</h3>
-        <div className="update-card">
-          <div>
-            <b data-testid="app-version">Orbit SSH v{appVersion || "-"}</b>
-            <small>
-              {t("installedVersion", { architecture: architecture === "arm64" ? "Apple Silicon" : architecture === "x64" ? "Intel Mac" : architecture })}
-            </small>
-          </div>
-          <button
-            type="button"
-            aria-label={t("checkUpdate")}
-            onClick={onCheckUpdates}
-            disabled={updateStatus.phase === "checking" || updateStatus.phase === "downloading"}
-          >
-            <RotateCw className={updateStatus.phase === "checking" ? "spinning" : ""} />
-            {updateStatus.phase === "checking" ? t("checking") : t("checkUpdate")}
-          </button>
-        </div>
-        {updateInfo?.updateAvailable ? (
-          <div className="update-result available">
-            <div>
-              <b>{t("updateAvailable", { version: updateInfo.latestVersion })}</b>
-              <small>
-                {updateInfo.assetName
-                  ? t("compatibleDmg", { architecture: architecture === "arm64" ? "Apple Silicon" : "Intel Mac" })
-                  : t("noCompatibleDmg")}
-              </small>
-            </div>
-            <div className="update-actions">
-              <button type="button" onClick={onOpenRelease}>
-                <ExternalLink /> {t("releaseNotes")}
-              </button>
-              <button
-                type="button"
-                className="primary"
-                onClick={onDownloadUpdate}
-                disabled={!updateInfo.assetName || updateStatus.phase === "downloading"}
-              >
-                <Download /> {updateStatus.phase === "downloading" ? `${updateStatus.percent ?? 0}%` : t("downloadDmg")}
-              </button>
-            </div>
-          </div>
-        ) : updateInfo ? (
-          <p className="update-message">{t("latestVersion")}</p>
-        ) : null}
-        {updateStatus.phase === "downloading" && (
-          <div className="update-progress" aria-label={t("downloadProgress")}>
-            <span style={{ width: `${updateStatus.percent ?? 0}%` }} />
-          </div>
-        )}
-        {updateStatus.phase === "completed" && (
-          <p className="update-message success">{t("dmgOpened")}</p>
-        )}
-        {updateError && <p className="update-message error">{updateError}</p>}
-      </section>
+      </div>
       <div className="modal-actions"><button type="button" onClick={onCancel}>{t("cancel")}</button><button className="primary">{t("saveSettings")}</button></div>
     </form>
   );

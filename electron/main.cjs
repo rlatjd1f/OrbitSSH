@@ -1020,27 +1020,41 @@ app.whenReady().then(() => {
         const settingsCheck = await mainWindow.webContents
           .executeJavaScript(`(async()=>{
           const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
-          const input=document.querySelector('[data-testid="default-user"]');
+          const navGeneral=document.querySelector('[data-testid="settings-nav-general"]');
+          const navTerminal=document.querySelector('[data-testid="settings-nav-terminal"]');
+          const navDefaults=document.querySelector('[data-testid="settings-nav-defaults"]');
+          const navUpdates=document.querySelector('[data-testid="settings-nav-updates"]');
+          const language=document.querySelector('[data-testid="language-select"]');
+          const settingsSidebarVisible=Boolean(navGeneral&&navTerminal&&navDefaults&&navUpdates&&document.querySelector('.settings-layout'));
+          const setValue=async(el,value)=>{const setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;setter.call(el,value);el.dispatchEvent(new Event('input',{bubbles:true}));await wait(30)};
+          const setSelect=async(el,value)=>{const setter=Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value').set;setter.call(el,value);el.dispatchEvent(new Event('change',{bubbles:true}));await wait(30)};
+          const settingsOpened=Boolean(settingsSidebarVisible&&language);
+          await setSelect(language,'en'); await wait(50);
+          const englishNavPreview=document.querySelector('.settings-modal h2')?.textContent==='Settings'&&document.querySelector('[data-testid="settings-nav-defaults"]')?.textContent.includes('New connection defaults');
+          document.querySelector('[data-testid="settings-nav-terminal"]')?.click(); await wait(40);
           const font=document.querySelector('[data-testid="terminal-font"]');
           const scrollback=document.querySelector('[data-testid="terminal-scrollback"]');
-          const language=document.querySelector('[data-testid="language-select"]');
-          const appVersion=document.querySelector('[data-testid="app-version"]');
-          const updateResult=[...document.querySelectorAll('.update-result b')].find(el=>el.textContent.includes('v0.2.0'));
-          const settingsOpened=Boolean(input&&font&&scrollback&&language);
           const defaultScrollback=scrollback?.value==='5000';
           const fontColor=font?getComputedStyle(font).color:'';
           const labelFontSize=font?parseFloat(getComputedStyle(font.closest('label')).fontSize):0;
           const sectionFontSize=parseFloat(getComputedStyle(document.querySelector('.settings-section h3')).fontSize);
-          const setValue=async(el,value)=>{const setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;setter.call(el,value);el.dispatchEvent(new Event('input',{bubbles:true}));await wait(30)};
-          const setSelect=async(el,value)=>{const setter=Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value').set;setter.call(el,value);el.dispatchEvent(new Event('change',{bubbles:true}));await wait(30)};
-          let englishPreview=false;
-          if(settingsOpened){await setValue(input,'global-test-user');await setSelect(font,'Menlo, Monaco, monospace');await setValue(scrollback,'7000');await setSelect(language,'en');englishPreview=document.querySelector('.settings-modal h2')?.textContent==='Settings'&&document.querySelector('[data-testid="default-user"]')?.getAttribute('aria-label')==='Default user';document.querySelector('.settings-modal .modal-actions .primary').click();await wait(100)}
+          if(font) await setSelect(font,'Menlo, Monaco, monospace');
+          if(scrollback) await setValue(scrollback,'7000');
+          document.querySelector('[data-testid="settings-nav-defaults"]')?.click(); await wait(40);
+          const input=document.querySelector('[data-testid="default-user"]');
+          if(input) await setValue(input,'global-test-user');
+          const englishDefaultUserLabel=document.querySelector('[data-testid="default-user"]')?.getAttribute('aria-label')==='Default user';
+          document.querySelector('[data-testid="settings-nav-updates"]')?.click(); await wait(40);
+          const appVersion=document.querySelector('[data-testid="app-version"]');
+          const updateResult=[...document.querySelectorAll('.update-result b')].find(el=>el.textContent.includes('0.2.0'));
+          const englishPreview=Boolean(settingsOpened&&englishNavPreview&&englishDefaultUserLabel&&document.querySelector('.settings-modal h2')?.textContent==='Settings');
+          if(settingsOpened){document.querySelector('.settings-modal .modal-actions .primary').click();await wait(100)}
           const defaultLocalSessionOpened=document.querySelector('.tabs button')?.textContent.includes('Local terminal')&&document.querySelector('.session-bar h2')?.textContent==='Local terminal';
           const englishAppUi=document.querySelector('[data-testid="new-folder"]')?.getAttribute('aria-label')==='New folder'&&document.querySelector('.add-connection')?.textContent.includes('New connection')&&defaultLocalSessionOpened&&document.querySelector('.update-toast span')?.textContent==='A new version is available.';
           document.querySelector('[data-testid="new-connection"]').click();await wait(30);
           const englishConnectionUi=document.querySelector('.modal h2')?.textContent==='New SSH connection'&&document.querySelector('[data-testid="device-name"]')?.getAttribute('aria-label')==='Device name'&&document.querySelector('.auth-options legend')?.textContent==='Authentication method';
           window.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape'}));await wait(30);
-          return {settingsOpened,englishPreview,englishAppUi,englishConnectionUi,defaultLocalSessionOpened,appVersionVisible:appVersion?.textContent.includes('v0.2.0'),updateAvailableVisible:Boolean(updateResult),fontOptionCount:font?.options.length,defaultScrollback,fontColor,labelFontSize,sectionFontSize,settingsClosed:!document.querySelector('.settings-modal')};
+          return {settingsOpened,settingsSidebarVisible,englishPreview,englishAppUi,englishConnectionUi,defaultLocalSessionOpened,appVersionVisible:appVersion?.textContent.includes('v0.2.0'),updateAvailableVisible:Boolean(updateResult),fontOptionCount:font?.options.length,defaultScrollback,fontColor,labelFontSize,sectionFontSize,settingsClosed:!document.querySelector('.settings-modal')};
         })()`);
         const englishMenuLabels = Menu.getApplicationMenu()?.items.flatMap(
           (item) => [
