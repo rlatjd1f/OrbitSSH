@@ -629,6 +629,7 @@ function App() {
   const [dialog, setDialog] = useState<
     "host" | "group" | "settings" | "session" | null
   >(null);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [sessionPickerHostId, setSessionPickerHostId] = useState("");
   const [sidebarMenu, setSidebarMenu] = useState<SidebarMenu>(null);
   const defaultLocalOpened = useRef(false);
@@ -1302,12 +1303,19 @@ function App() {
       </div>
     );
   return (
-    <div className="app-shell">
+    <div className={`app-shell ${sidebarCollapsed ? "sidebar-collapsed" : ""}`}>
       <aside className="rail">
         <div className="logo">
           <Command />
         </div>
-        <button className="rail-active">
+        <button
+          className={`rail-toggle ${sidebarCollapsed ? "" : "rail-active"}`}
+          data-testid="sidebar-toggle"
+          aria-pressed={!sidebarCollapsed}
+          aria-label={sidebarCollapsed ? t("showSidebar") : t("hideSidebar")}
+          title={sidebarCollapsed ? t("showSidebar") : t("hideSidebar")}
+          onClick={() => setSidebarCollapsed((value) => !value)}
+        >
           <TerminalSquare />
         </button>
         <button>

@@ -1105,6 +1105,17 @@ app.whenReady().then(() => {
           ready();
         })`);
         await new Promise((resolve) => setTimeout(resolve, 100));
+        const sidebarToggleCheck = await mainWindow.webContents.executeJavaScript(`(async()=>{
+          const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+          const shell=document.querySelector('.app-shell');
+          const button=document.querySelector('[data-testid="sidebar-toggle"]');
+          const before=Boolean(shell&&button&&!shell.classList.contains('sidebar-collapsed')&&button.getAttribute('aria-pressed')==='true');
+          button?.click(); await wait(260);
+          const collapsed=Boolean(shell?.classList.contains('sidebar-collapsed')&&button?.getAttribute('aria-pressed')==='false');
+          button?.click(); await wait(260);
+          const expanded=Boolean(!shell?.classList.contains('sidebar-collapsed')&&button?.getAttribute('aria-pressed')==='true');
+          return before&&collapsed&&expanded;
+        })()`);
         const settingsModifier =
           process.platform === "darwin" ? "meta" : "control";
         mainWindow.webContents.sendInputEvent({
@@ -1283,6 +1294,7 @@ app.whenReady().then(() => {
         })()`);
         result.settingsShortcut =
           settingsCheck.settingsOpened && settingsCheck.settingsClosed;
+        result.sidebarToggle = sidebarToggleCheck;
         result.englishLanguagePreview = settingsCheck.englishPreview;
         result.englishAppUi = settingsCheck.englishAppUi;
         result.englishConnectionUi = settingsCheck.englishConnectionUi;
@@ -1796,6 +1808,7 @@ app.whenReady().then(() => {
           terminalStartCount === startsBeforeSessionDoubleClick + 1 &&
           (await workspaceTabsCount()) === 6;
         const passed =
+          result.sidebarToggle &&
           result.settingsShortcut &&
           result.englishLanguagePreview &&
           result.englishAppUi &&
