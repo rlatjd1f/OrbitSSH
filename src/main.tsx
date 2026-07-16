@@ -720,6 +720,19 @@ function App() {
       );
     }
   };
+  const focusPane = (direction: -1 | 1) => {
+    if (!visibleSessions.length || !activeTabId) return;
+    const index = visibleSessions.findIndex(
+      (session) => session.tabId === activeTabId,
+    );
+    const next =
+      visibleSessions[
+        (index + direction + visibleSessions.length) % visibleSessions.length
+      ];
+    if (!next) return;
+    setActiveTabId(next.tabId);
+    setSelectedHostId(next.hostId);
+  };
   const closePane = async (tabId: string) => {
     const index = sessions.findIndex((v) => v.tabId === tabId);
     const session = sessions[index];
@@ -798,6 +811,21 @@ function App() {
           if (activeSession && visibleSessions.length < 4) {
             const host = store.hosts.find((h) => h.id === activeSession.hostId);
             if (host) void connect(host, true);
+          }
+          return;
+        }
+        if (action === "previous-pane") {
+          focusPane(-1);
+          return;
+        }
+        if (action === "next-pane") {
+          focusPane(1);
+          return;
+        }
+        if (action === "duplicate-tab") {
+          if (activeSession) {
+            const host = store.hosts.find((h) => h.id === activeSession.hostId);
+            if (host) void connect(host);
           }
           return;
         }

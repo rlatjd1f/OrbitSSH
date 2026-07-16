@@ -469,6 +469,24 @@
 .split-grid.terminal-suspended {
   display: none;
 }
+.workspace footer {
+  height: 28px;
+  background: #161a22;
+  border-top-color: #323846;
+  color: #a7afbf;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+}
+.workspace footer span {
+  opacity: 0.96;
+}
+.workspace footer i {
+  width: 6px;
+  height: 6px;
+  background: #55d4ad;
+  box-shadow: 0 0 8px rgba(85, 212, 173, 0.55);
+}
 .settings-modal {
   width: 600px;
   max-height: calc(100vh - 48px);

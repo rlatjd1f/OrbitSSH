@@ -90,6 +90,9 @@ interface Window {
         action:
           | "close-tab"
           | "next-tab"
+          | "previous-pane"
+          | "next-pane"
+          | "duplicate-tab"
           | "split-tab"
           | "open-settings"
           | "copy-selection",

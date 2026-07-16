@@ -620,6 +620,30 @@ function createWindow() {
     } else if (key === "d" && input.meta) {
       event.preventDefault();
       mainWindow.webContents.send("shortcut:action", "split-tab");
+    } else if (
+      input.type === "keyDown" &&
+      (input.control || modifiers.includes("control")) &&
+      !input.meta &&
+      (key === "[" || input.code === "BracketLeft")
+    ) {
+      event.preventDefault();
+      mainWindow.webContents.send("shortcut:action", "previous-pane");
+    } else if (
+      input.type === "keyDown" &&
+      (input.control || modifiers.includes("control")) &&
+      !input.meta &&
+      (key === "]" || input.code === "BracketRight")
+    ) {
+      event.preventDefault();
+      mainWindow.webContents.send("shortcut:action", "next-pane");
+    } else if (
+      input.type === "keyDown" &&
+      key === "t" &&
+      (input.control || modifiers.includes("control")) &&
+      !input.meta
+    ) {
+      event.preventDefault();
+      mainWindow.webContents.send("shortcut:action", "duplicate-tab");
     } else if (key === "," && (input.meta || input.control)) {
       event.preventDefault();
       mainWindow.webContents.send("shortcut:action", "open-settings");
@@ -988,6 +1012,9 @@ app.whenReady().then(() => {
         result.settingsLabelsLarger =
           settingsCheck.labelFontSize >= 12 &&
           settingsCheck.sectionFontSize >= 13;
+        result.footerReadable = await mainWindow.webContents.executeJavaScript(
+          `(()=>{const footer=document.querySelector('.workspace footer');if(!footer)return false;const style=getComputedStyle(footer);return parseFloat(style.fontSize)>=10&&style.color!=='rgb(97, 104, 119)'&&style.backgroundColor!=='rgb(18, 21, 27)'})()`,
+        );
         await mainWindow.webContents.executeJavaScript(
           `(()=>document.querySelector('.terminal-pane.focused textarea')?.focus())()`,
         );
@@ -1192,6 +1219,48 @@ app.whenReady().then(() => {
         result.maxFour = await mainWindow.webContents.executeJavaScript(
           `(()=>document.querySelectorAll('.terminal-pane').length===4)()`,
         );
+        const focusedPaneBeforeCycle =
+          await mainWindow.webContents.executeJavaScript(
+            `(()=>[...document.querySelectorAll('.terminal-pane:not(.cached)')].findIndex(el=>el.classList.contains('focused')))()`,
+          );
+        mainWindow.webContents.sendInputEvent({
+          type: "keyDown",
+          keyCode: "[",
+          modifiers: ["control"],
+        });
+        mainWindow.webContents.sendInputEvent({
+          type: "keyUp",
+          keyCode: "[",
+          modifiers: ["control"],
+        });
+        await new Promise((resolve) => setTimeout(resolve, 80));
+        const focusedPaneAfterPrevious =
+          await mainWindow.webContents.executeJavaScript(
+            `(()=>[...document.querySelectorAll('.terminal-pane:not(.cached)')].findIndex(el=>el.classList.contains('focused')))()`,
+          );
+        mainWindow.webContents.sendInputEvent({
+          type: "keyDown",
+          keyCode: "]",
+          modifiers: ["control"],
+        });
+        mainWindow.webContents.sendInputEvent({
+          type: "keyUp",
+          keyCode: "]",
+          modifiers: ["control"],
+        });
+        await new Promise((resolve) => setTimeout(resolve, 80));
+        const focusedPaneAfterNext =
+          await mainWindow.webContents.executeJavaScript(
+            `(()=>[...document.querySelectorAll('.terminal-pane:not(.cached)')].findIndex(el=>el.classList.contains('focused')))()`,
+          );
+        result.ctrlBracketMovesPane =
+          focusedPaneBeforeCycle === 3 &&
+          focusedPaneAfterPrevious === 2 &&
+          focusedPaneAfterNext === 3;
+        result.ctrlBracketFocusedTerminal =
+          await mainWindow.webContents.executeJavaScript(
+            `(()=>document.activeElement===document.querySelector('.terminal-pane.focused textarea'))()`,
+          );
         const remainingPaneCounts = [];
         for (let index = 0; index < 2; index += 1) {
           mainWindow.webContents.sendInputEvent({
@@ -1217,6 +1286,23 @@ app.whenReady().then(() => {
           await mainWindow.webContents.executeJavaScript(
             `(()=>[...document.querySelectorAll('.tabs button')].filter(el=>el.textContent.includes('test-host')).length===1)()`,
           );
+        const startsBeforeDuplicate = terminalStartCount;
+        mainWindow.webContents.sendInputEvent({
+          type: "keyDown",
+          keyCode: "T",
+          modifiers: ["control"],
+        });
+        mainWindow.webContents.sendInputEvent({
+          type: "keyUp",
+          keyCode: "T",
+          modifiers: ["control"],
+        });
+        await new Promise((resolve) => setTimeout(resolve, 200));
+        result.ctrlTOpensDuplicateTab =
+          terminalStartCount === startsBeforeDuplicate + 1 &&
+          (await mainWindow.webContents.executeJavaScript(
+            `(()=>{const tabs=[...document.querySelectorAll('.tabs button')].filter(el=>el.textContent.includes('test-host'));return tabs.length===2&&tabs[1].classList.contains('active')&&document.querySelectorAll('.terminal-pane:not(.cached)').length===1})()`,
+          ));
         const passed =
           result.settingsShortcut &&
           result.englishLanguagePreview &&
@@ -1233,6 +1319,7 @@ app.whenReady().then(() => {
           result.fontComboHasTenOptions &&
           result.settingsSelectReadable &&
           result.settingsLabelsLarger &&
+          result.footerReadable &&
           result.enterReconnectsSamePane &&
           result.ctrlCSentToTerminal &&
           result.remappedCtrlCSentToTerminal &&
@@ -1258,8 +1345,11 @@ app.whenReady().then(() => {
           result.trueTwoByTwo &&
           result.splitDoesNotAddTabs &&
           result.maxFour &&
+          result.ctrlBracketMovesPane &&
+          result.ctrlBracketFocusedTerminal &&
           result.splitCloseOneByOne &&
-          result.topTabRemainsAfterPaneClose;
+          result.topTabRemainsAfterPaneClose &&
+          result.ctrlTOpensDuplicateTab;
         console.log(
           `UI integration: ${passed ? "OK" : "FAIL"} ${JSON.stringify(result)}`,
         );
