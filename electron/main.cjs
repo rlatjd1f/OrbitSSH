@@ -55,16 +55,16 @@ async function checkForUpdate(force = false) {
   const currentVersion = app.getVersion();
   if (process.env.ORBIT_UI_SELF_TEST === "1") {
     availableUpdate = {
-      assetUrl: `https://github.com/rlatjd1f/OrbitSSH/releases/download/v0.2.0/OrbitSSH-0.2.0-${process.arch}.dmg`,
-      assetName: `OrbitSSH-0.2.0-${process.arch}.dmg`,
-      releaseUrl: "https://github.com/rlatjd1f/OrbitSSH/releases/tag/v0.2.0",
+      assetUrl: `https://github.com/rlatjd1f/OrbitSSH/releases/download/v0.4.0/OrbitSSH-0.4.0-${process.arch}.dmg`,
+      assetName: `OrbitSSH-0.4.0-${process.arch}.dmg`,
+      releaseUrl: "https://github.com/rlatjd1f/OrbitSSH/releases/tag/v0.4.0",
     };
     return {
       currentVersion,
       updateAvailable: true,
-      latestVersion: "0.2.0",
-      tagName: "v0.2.0",
-      releaseName: "Orbit SSH v0.2.0",
+      latestVersion: "0.4.0",
+      tagName: "v0.4.0",
+      releaseName: "Orbit SSH v0.4.0",
       releaseNotes: "## 🚀 업데이트 내역\n\n- 업데이트 테스트",
       releaseUrl: availableUpdate.releaseUrl,
       assetName: availableUpdate.assetName,
@@ -1046,7 +1046,7 @@ app.whenReady().then(() => {
           const englishDefaultUserLabel=document.querySelector('[data-testid="default-user"]')?.getAttribute('aria-label')==='Default user';
           document.querySelector('[data-testid="settings-nav-updates"]')?.click(); await wait(40);
           const appVersion=document.querySelector('[data-testid="app-version"]');
-          const updateResult=[...document.querySelectorAll('.update-result b')].find(el=>el.textContent.includes('0.2.0'));
+          const updateResult=[...document.querySelectorAll('.update-result b')].find(el=>el.textContent.includes('0.4.0'));
           const englishPreview=Boolean(settingsOpened&&englishNavPreview&&englishDefaultUserLabel&&document.querySelector('.settings-modal h2')?.textContent==='Settings');
           if(settingsOpened){document.querySelector('.settings-modal .modal-actions .primary').click();await wait(100)}
           const defaultLocalSessionOpened=document.querySelector('.tabs button')?.textContent.includes('Local terminal')&&document.querySelector('.session-bar h2')?.textContent==='Local terminal';
@@ -1054,7 +1054,7 @@ app.whenReady().then(() => {
           document.querySelector('[data-testid="new-connection"]').click();await wait(30);
           const englishConnectionUi=document.querySelector('.modal h2')?.textContent==='New SSH connection'&&document.querySelector('[data-testid="device-name"]')?.getAttribute('aria-label')==='Device name'&&document.querySelector('.auth-options legend')?.textContent==='Authentication method';
           window.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape'}));await wait(30);
-          return {settingsOpened,settingsSidebarVisible,englishPreview,englishAppUi,englishConnectionUi,defaultLocalSessionOpened,appVersionVisible:appVersion?.textContent.includes('v0.2.0'),updateAvailableVisible:Boolean(updateResult),fontOptionCount:font?.options.length,defaultScrollback,fontColor,labelFontSize,sectionFontSize,settingsClosed:!document.querySelector('.settings-modal')};
+          return {settingsOpened,settingsSidebarVisible,englishPreview,englishAppUi,englishConnectionUi,defaultLocalSessionOpened,appVersionVisible:appVersion?.textContent.includes('v${app.getVersion()}'),updateAvailableVisible:Boolean(updateResult),fontOptionCount:font?.options.length,defaultScrollback,fontColor,labelFontSize,sectionFontSize,settingsClosed:!document.querySelector('.settings-modal')};
         })()`);
         const englishMenuLabels = Menu.getApplicationMenu()?.items.flatMap(
           (item) => [

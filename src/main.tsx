@@ -294,6 +294,12 @@ function SettingsForm({
     translate(language, key, values);
   const update = <K extends keyof AppSettings>(key: K, next: AppSettings[K]) =>
     onChange({ ...value, [key]: next });
+  const isDownloading = updateStatus.phase === "downloading";
+  const downloadPercent = Math.max(
+    0,
+    Math.min(100, Math.round(updateStatus.percent ?? 0)),
+  );
+  const hasDownloadTotal = Boolean(updateStatus.total && updateStatus.total > 0);
   const sectionButtons = [
     { id: "general", label: t("general"), icon: Settings },
     { id: "terminal", label: t("terminal"), icon: TerminalSquare },
@@ -559,18 +565,33 @@ function SettingsForm({
                       }
                     >
                       <Download />{" "}
-                      {updateStatus.phase === "downloading"
-                        ? `${updateStatus.percent ?? 0}%`
-                        : t("downloadDmg")}
+                      {isDownloading ? t("downloadingUpdate") : t("downloadDmg")}
                     </button>
                   </div>
                 </div>
               ) : updateInfo ? (
                 <p className="update-message">{t("latestVersion")}</p>
               ) : null}
-              {updateStatus.phase === "downloading" && (
-                <div className="update-progress" aria-label={t("downloadProgress")}>
-                  <span style={{ width: `${updateStatus.percent ?? 0}%` }} />
+              {isDownloading && (
+                <div className="update-progress-card" data-testid="update-progress-card">
+                  <div className="update-progress-header">
+                    <b>{t("downloadingUpdate")}</b>
+                    <span>{downloadPercent}%</span>
+                  </div>
+                  <div
+                    className={`update-progress ${hasDownloadTotal ? "" : "indeterminate"}`}
+                    aria-label={t("downloadProgress")}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-valuenow={downloadPercent}
+                    role="progressbar"
+                  >
+                    <span
+                      style={{
+                        width: hasDownloadTotal ? `${downloadPercent}%` : "42%",
+                      }}
+                    />
+                  </div>
                 </div>
               )}
               {updateStatus.phase === "completed" && (

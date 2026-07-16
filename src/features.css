@@ -849,19 +849,62 @@
   background: #6c5ce7;
   color: #fff;
 }
+.update-progress-card {
+  margin-top: 10px;
+  border: 1px solid #303746;
+  border-radius: 8px;
+  background: #10141d;
+  padding: 12px;
+}
+.update-progress-header {
+  margin-bottom: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.update-progress-header b {
+  color: #e8ebf3;
+  font-size: 12px;
+}
+.update-progress-header span {
+  min-width: 42px;
+  color: #8be4c0;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 12px;
+  font-weight: 800;
+  text-align: right;
+}
 .update-progress {
-  height: 4px;
-  margin: 9px 2px 0;
+  position: relative;
+  height: 10px;
   overflow: hidden;
   border-radius: 999px;
-  background: #292d36;
+  background: #252a35;
+  box-shadow: inset 0 0 0 1px #303746;
 }
 .update-progress span {
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: #7565f2;
-  transition: width 120ms ease;
+  background:
+    linear-gradient(90deg, #6c5ce7, #48d6a2, #6c5ce7),
+    repeating-linear-gradient(
+      45deg,
+      rgba(255, 255, 255, 0.18) 0,
+      rgba(255, 255, 255, 0.18) 8px,
+      transparent 8px,
+      transparent 16px
+    );
+  background-size: 180% 100%, 24px 24px;
+  box-shadow: 0 0 16px rgba(108, 92, 231, 0.45);
+  transition: width 180ms ease;
+  animation: update-progress-flow 1.15s linear infinite;
+}
+.update-progress.indeterminate span {
+  animation:
+    update-progress-flow 1.15s linear infinite,
+    update-progress-indeterminate 1.35s ease-in-out infinite;
 }
 .update-message {
   margin: 9px 2px 0 !important;
@@ -879,6 +922,14 @@
 }
 @keyframes update-spin {
   to { transform: rotate(360deg); }
+}
+@keyframes update-progress-flow {
+  to { background-position: 180% 0, 24px 0; }
+}
+@keyframes update-progress-indeterminate {
+  0% { transform: translateX(-120%); }
+  55% { transform: translateX(80%); }
+  100% { transform: translateX(240%); }
 }
 .update-toast {
   position: fixed;
