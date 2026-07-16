@@ -35,10 +35,16 @@ type Session = {
   tabId: string;
   workspaceId: string;
   hostId: string;
+  kind: TerminalStartKind;
   sessionId?: string;
   state: SessionState;
 };
 type SidebarMenu = { hostId: string; x: number; y: number } | null;
+type SessionHostView = Pick<
+  ConnectionHost,
+  "id" | "name" | "host" | "user" | "port"
+> & { kind: TerminalStartKind };
+const LOCAL_HOST_ID = "__orbit-local-terminal__";
 const emptyStore: ConnectionStore = { groups: [], hosts: [] };
 const defaultSettings: AppSettings = {
   language: "ko",
@@ -430,6 +436,7 @@ function App() {
   >(null);
   const [sessionPickerHostId, setSessionPickerHostId] = useState("");
   const [sidebarMenu, setSidebarMenu] = useState<SidebarMenu>(null);
+  const defaultLocalOpened = useRef(false);
   const [editing, setEditing] = useState<ConnectionHost | null>(null);
   const [settings, setSettings] = useState<AppSettings>(defaultSettings);
   const [settingsDraft, setSettingsDraft] =
@@ -465,9 +472,26 @@ function App() {
     );
   const activeSession = sessions.find((s) => s.tabId === activeTabId);
   const activeWorkspaceId = activeSession?.workspaceId;
-  const activeHost = store.hosts.find(
-    (h) => h.id === (activeSession?.hostId ?? selectedHostId),
-  );
+  const getSessionHost = (session?: Session): SessionHostView | undefined => {
+    if (!session) return undefined;
+    if (session.kind === "local")
+      return {
+        id: LOCAL_HOST_ID,
+        name: t("localTerminal"),
+        host: t("localMachine"),
+        user: window.desktop?.platform === "darwin" ? "macOS" : "local",
+        port: 0,
+        kind: "local",
+      };
+    const host = store.hosts.find((h) => h.id === session.hostId);
+    return host ? { ...host, kind: "ssh" } : undefined;
+  };
+  const selectedHost = store.hosts.find((h) => h.id === selectedHostId);
+  const activeHost = activeSession
+    ? getSessionHost(activeSession)
+    : selectedHost
+      ? { ...selectedHost, kind: "ssh" as const }
+      : undefined;
   const visibleSessions = activeWorkspaceId
     ? sessions.filter((session) => session.workspaceId === activeWorkspaceId)
     : [];
@@ -767,7 +791,7 @@ function App() {
     setActiveTabId(tabId);
     setSessions((x) => [
       ...x,
-      { tabId, workspaceId, hostId: host.id, state: "connecting" },
+      { tabId, workspaceId, hostId: host.id, kind: "ssh", state: "connecting" },
     ]);
     try {
       const sessionId = await window.desktop!.terminal.start(host);
@@ -782,9 +806,67 @@ function App() {
       );
     }
   };
+  const openLocalTerminal = async (asSplit = false) => {
+    const currentPanes = activeWorkspaceId
+      ? sessions.filter((session) => session.workspaceId === activeWorkspaceId)
+      : [];
+    if (asSplit && (!activeWorkspaceId || currentPanes.length >= 4)) return;
+    const tabId = crypto.randomUUID();
+    const workspaceId = asSplit ? activeWorkspaceId! : tabId;
+    setSelectedHostId("");
+    setActiveTabId(tabId);
+    setSessions((x) => [
+      ...x,
+      {
+        tabId,
+        workspaceId,
+        hostId: LOCAL_HOST_ID,
+        kind: "local",
+        state: "connecting",
+      },
+    ]);
+    try {
+      const sessionId = await window.desktop!.terminal.startLocal();
+      setSessions((x) =>
+        x.map((s) =>
+          s.tabId === tabId ? { ...s, sessionId, state: "connected" } : s,
+        ),
+      );
+    } catch {
+      setSessions((x) =>
+        x.map((s) => (s.tabId === tabId ? { ...s, state: "error" } : s)),
+      );
+    }
+  };
   const reconnectPane = async (tabId: string) => {
     const pane = sessions.find((session) => session.tabId === tabId);
     if (!pane || !["closed", "error"].includes(pane.state)) return;
+    if (pane.kind === "local") {
+      setSessions((current) =>
+        current.map((session) =>
+          session.tabId === tabId
+            ? { ...session, sessionId: undefined, state: "connecting" }
+            : session,
+        ),
+      );
+      try {
+        const sessionId = await window.desktop!.terminal.startLocal();
+        setSessions((current) =>
+          current.map((session) =>
+            session.tabId === tabId
+              ? { ...session, sessionId, state: "connected" }
+              : session,
+          ),
+        );
+      } catch {
+        setSessions((current) =>
+          current.map((session) =>
+            session.tabId === tabId ? { ...session, state: "error" } : session,
+          ),
+        );
+      }
+      return;
+    }
     const host = store.hosts.find((item) => item.id === pane.hostId);
     if (!host) return;
     setSessions((current) =>
@@ -822,7 +904,7 @@ function App() {
       ];
     if (!next) return;
     setActiveTabId(next.tabId);
-    setSelectedHostId(next.hostId);
+    setSelectedHostId(next.kind === "ssh" ? next.hostId : "");
   };
   const closePane = async (tabId: string) => {
     const index = sessions.findIndex((v) => v.tabId === tabId);
@@ -844,7 +926,7 @@ function App() {
         splitNext ??
         roots[Math.min(Math.max(index, 0), roots.length - 1)];
       setActiveTabId(next?.tabId ?? "");
-      if (next) setSelectedHostId(next.hostId);
+      if (next) setSelectedHostId(next.kind === "ssh" ? next.hostId : "");
     }
   };
   const closeWorkspace = async (workspaceId: string) => {
@@ -872,12 +954,17 @@ function App() {
         (tab) => tab.workspaceId === workspaceId,
       );
       const next = roots[Math.min(Math.max(closedIndex, 0), roots.length - 1)];
-      setActiveTabId(next?.tabId ?? "");
-      if (next) setSelectedHostId(next.hostId);
+    setActiveTabId(next?.tabId ?? "");
+      if (next) setSelectedHostId(next.kind === "ssh" ? next.hostId : "");
     }
   };
   const setSessionState = (tabId: string, state: SessionState) =>
     setSessions((x) => x.map((s) => (s.tabId === tabId ? { ...s, state } : s)));
+  useEffect(() => {
+    if (!loaded || defaultLocalOpened.current || sessions.length > 0) return;
+    defaultLocalOpened.current = true;
+    void openLocalTerminal();
+  }, [loaded, sessions.length]);
   useEffect(
     () =>
       window.desktop?.onShortcut((action) => {
@@ -904,8 +991,11 @@ function App() {
         }
         if (action === "split-tab") {
           if (activeSession && visibleSessions.length < 4) {
-            const host = store.hosts.find((h) => h.id === activeSession.hostId);
-            if (host) void connect(host, true);
+            if (activeSession.kind === "local") void openLocalTerminal(true);
+            else {
+              const host = store.hosts.find((h) => h.id === activeSession.hostId);
+              if (host) void connect(host, true);
+            }
           }
           return;
         }
@@ -926,13 +1016,18 @@ function App() {
             workspaceTabCount: workspaceTabs.length,
           });
           if (activeSession) {
-            const host = store.hosts.find((h) => h.id === activeSession.hostId);
+            const host =
+              activeSession.kind === "ssh"
+                ? store.hosts.find((h) => h.id === activeSession.hostId)
+                : undefined;
             window.desktop?.debug?.logShortcut("duplicate-tab:host", {
-              found: Boolean(host),
+              found: activeSession.kind === "local" || Boolean(host),
               hostId: activeSession.hostId,
-              hostName: host?.name ?? null,
+              hostName:
+                activeSession.kind === "local" ? "local" : host?.name ?? null,
             });
-            if (host) void connect(host);
+            if (activeSession.kind === "local") void openLocalTerminal();
+            else if (host) void connect(host);
           }
           return;
         }
@@ -943,12 +1038,12 @@ function App() {
           const next =
             workspaceTabs[
               (index + 1 + workspaceTabs.length) % workspaceTabs.length
-            ];
+          ];
           setActiveTabId(next.tabId);
-          setSelectedHostId(next.hostId);
+          setSelectedHostId(next.kind === "ssh" ? next.hostId : "");
         }
       }),
-    [sessions, activeTabId, store, settings],
+    [sessions, activeTabId, store, settings, loaded],
   );
   const groups = useMemo(
     () =>
@@ -1224,7 +1319,7 @@ function App() {
       <main className="workspace">
         <div className="tabs">
           {workspaceTabs.map((s) => {
-            const h = store.hosts.find((v) => v.id === s.hostId);
+            const h = getSessionHost(s);
             return (
               h && (
                 <button
@@ -1236,7 +1331,7 @@ function App() {
                         session.tabId === activeTabId,
                     );
                     setActiveTabId(focusedPane?.tabId ?? s.tabId);
-                    setSelectedHostId(h.id);
+                    setSelectedHostId(s.kind === "ssh" ? h.id : "");
                   }}
                   className={
                     activeWorkspaceId === s.workspaceId ? "active" : ""
@@ -1270,26 +1365,28 @@ function App() {
                     ],
                 }}
               >
-                <Server />
+                {activeHost.kind === "local" ? <TerminalSquare /> : <Server />}
               </div>
               <div>
                 <h2>{activeHost.name}</h2>
                 <p>
-                  {activeHost.user}@{activeHost.host} · port {activeHost.port}
+                  {activeHost.kind === "local"
+                    ? `${activeHost.host} · ${t("systemShell")}`
+                    : `${activeHost.user}@${activeHost.host} · port ${activeHost.port}`}
                 </p>
               </div>
               {activeSession ? (
                 <span className={`connection-state ${activeSession.state}`}>
                   <i /> {stateLabel(activeSession.state)}
                 </span>
-              ) : (
+              ) : activeHost.kind === "ssh" ? (
                 <button
                   className="connect-button"
-                  onClick={() => connect(activeHost)}
+                  onClick={() => selectedHost && connect(selectedHost)}
                 >
                   {t("connect")}
                 </button>
-              )}
+              ) : null}
               {activeSession &&
                 ["closed", "error"].includes(activeSession.state) && (
                   <button
@@ -1305,7 +1402,7 @@ function App() {
                 className={`terminal split-grid panes-${Math.max(visibleSessions.length, 1)} ${activeSession ? "" : "terminal-suspended"}`}
               >
                 {sessions.map((session) => {
-                  const host = store.hosts.find((h) => h.id === session.hostId);
+                  const host = getSessionHost(session);
                   const isVisible = visibleSessions.some(
                     (visible) => visible.tabId === session.tabId,
                   );
@@ -1315,14 +1412,18 @@ function App() {
                       className={`terminal-pane ${isVisible ? "" : "cached"} ${activeTabId === session.tabId ? "focused" : ""}`}
                       onMouseDown={() => {
                         setActiveTabId(session.tabId);
-                        setSelectedHostId(session.hostId);
+                        setSelectedHostId(
+                          session.kind === "ssh" ? session.hostId : "",
+                        );
                       }}
                     >
                       <div className="pane-bar">
                         <span className={`status ${session.state}`} />
                         <b>{host?.name}</b>
                         <small>
-                          {host?.user}@{host?.host}
+                          {host?.kind === "local"
+                            ? host.host
+                            : `${host?.user}@${host?.host}`}
                         </small>
                         <button
                           title={t("closePane")}
@@ -1349,19 +1450,19 @@ function App() {
                 })}
               </section>
             )}
-            {!activeSession && (
+            {!activeSession && activeHost.kind === "ssh" && (
               <div className="ready">
                 <TerminalSquare />
                 <h2>{t("readyToConnect")}</h2>
                 <p>{t("connectDescription")}</p>
-                <button onClick={() => connect(activeHost)}>
+                <button onClick={() => selectedHost && connect(selectedHost)}>
                   {t("connectTo", { name: activeHost.name })}
                 </button>
               </div>
             )}
             <footer>
               <span>
-                <i /> {t("systemOpenSsh")}
+                <i /> {activeSession?.kind === "local" ? t("systemShell") : t("systemOpenSsh")}
               </span>
               <span>UTF-8</span>
               <span>PTY · xterm-256color</span>

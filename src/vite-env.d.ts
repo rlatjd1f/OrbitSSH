@@ -13,6 +13,7 @@ type ConnectionHost = {
   password?: string;
 };
 type ConnectionStore = { groups: ConnectionGroup[]; hosts: ConnectionHost[] };
+type TerminalStartKind = "ssh" | "local";
 type AppSettings = {
   language: "ko" | "en";
   terminalFontSize: number;
@@ -69,6 +70,7 @@ interface Window {
     };
     terminal: {
       start(host: ConnectionHost): Promise<string>;
+      startLocal(): Promise<string>;
       write(sessionId: string, data: string): void;
       setActive(sessionId: string | null): void;
       resize(sessionId: string, cols: number, rows: number): void;

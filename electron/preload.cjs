@@ -27,6 +27,7 @@ contextBridge.exposeInMainWorld("desktop", {
   },
   terminal: {
     start: (host) => ipcRenderer.invoke("terminal:start", host),
+    startLocal: () => ipcRenderer.invoke("terminal:start-local"),
     write: (sessionId, data) =>
       ipcRenderer.send("terminal:write", { sessionId, data }),
     setActive: (sessionId) =>

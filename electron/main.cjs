@@ -553,6 +553,35 @@ function startSession(host) {
   return sessionId;
 }
 
+function startLocalSession() {
+  if (process.env.ORBIT_UI_SELF_TEST === "1") terminalStartCount += 1;
+  const sessionId = crypto.randomUUID();
+  const fallbackShell = process.platform === "darwin" ? "/bin/zsh" : "/bin/bash";
+  const shellPath =
+    process.env.SHELL ||
+    (process.platform === "win32" ? "powershell.exe" : fallbackShell);
+  const args =
+    process.platform === "win32"
+      ? []
+      : path.basename(shellPath).includes("fish")
+        ? ["-l"]
+        : ["-l"];
+  const proc = pty.spawn(shellPath, args, {
+    name: "xterm-256color",
+    cols: 80,
+    rows: 24,
+    cwd: app.getPath("home"),
+    env: { ...process.env, TERM: "xterm-256color" },
+  });
+  sessions.set(sessionId, proc);
+  proc.onData((data) => send("terminal:data", { sessionId, data }));
+  proc.onExit(({ exitCode, signal }) => {
+    if (!sessions.has(sessionId)) return;
+    markTerminalExited(sessionId, exitCode, signal);
+  });
+  return sessionId;
+}
+
 function registerIpc() {
   ipcMain.handle("app:get-version", () => app.getVersion());
   ipcMain.handle("update:check", (_event, force) =>
@@ -577,6 +606,7 @@ function registerIpc() {
     return saved;
   });
   ipcMain.handle("terminal:start", (_event, host) => startSession(host));
+  ipcMain.handle("terminal:start-local", () => startLocalSession());
   ipcMain.on("terminal:write", (_event, { sessionId, data }) => {
     if (process.env.ORBIT_UI_SELF_TEST === "1")
       lastTerminalWrite = { sessionId, data };
@@ -966,11 +996,12 @@ app.whenReady().then(() => {
           const setSelect=async(el,value)=>{const setter=Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value').set;setter.call(el,value);el.dispatchEvent(new Event('change',{bubbles:true}));await wait(30)};
           let englishPreview=false;
           if(settingsOpened){await setValue(input,'global-test-user');await setSelect(font,'Menlo, Monaco, monospace');await setValue(scrollback,'7000');await setSelect(language,'en');englishPreview=document.querySelector('.settings-modal h2')?.textContent==='Settings'&&document.querySelector('[data-testid="default-user"]')?.getAttribute('aria-label')==='Default user';document.querySelector('.settings-modal .modal-actions .primary').click();await wait(100)}
-          const englishAppUi=document.querySelector('[data-testid="new-folder"]')?.getAttribute('aria-label')==='New folder'&&document.querySelector('.add-connection')?.textContent.includes('New connection')&&document.querySelector('.empty h2')?.textContent==='No active sessions'&&document.querySelector('.update-toast span')?.textContent==='A new version is available.';
+          const defaultLocalSessionOpened=document.querySelector('.tabs button')?.textContent.includes('Local terminal')&&document.querySelector('.session-bar h2')?.textContent==='Local terminal';
+          const englishAppUi=document.querySelector('[data-testid="new-folder"]')?.getAttribute('aria-label')==='New folder'&&document.querySelector('.add-connection')?.textContent.includes('New connection')&&defaultLocalSessionOpened&&document.querySelector('.update-toast span')?.textContent==='A new version is available.';
           document.querySelector('[data-testid="new-connection"]').click();await wait(30);
           const englishConnectionUi=document.querySelector('.modal h2')?.textContent==='New SSH connection'&&document.querySelector('[data-testid="device-name"]')?.getAttribute('aria-label')==='Device name'&&document.querySelector('.auth-options legend')?.textContent==='Authentication method';
           window.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape'}));await wait(30);
-          return {settingsOpened,englishPreview,englishAppUi,englishConnectionUi,appVersionVisible:appVersion?.textContent.includes('v0.1.0'),updateAvailableVisible:Boolean(updateResult),fontOptionCount:font?.options.length,defaultScrollback,fontColor,labelFontSize,sectionFontSize,settingsClosed:!document.querySelector('.settings-modal')};
+          return {settingsOpened,englishPreview,englishAppUi,englishConnectionUi,defaultLocalSessionOpened,appVersionVisible:appVersion?.textContent.includes('v0.1.0'),updateAvailableVisible:Boolean(updateResult),fontOptionCount:font?.options.length,defaultScrollback,fontColor,labelFontSize,sectionFontSize,settingsClosed:!document.querySelector('.settings-modal')};
         })()`);
         const englishMenuLabels = Menu.getApplicationMenu()?.items.flatMap(
           (item) => [
@@ -1056,6 +1087,8 @@ app.whenReady().then(() => {
           document.querySelector('input[value="key"]').click(); await wait(20);
           const keyVisible=Boolean(document.querySelector('input[placeholder="~/.ssh/id_ed25519"]'));
           window.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape'})); await wait(20);
+          const localTab=[...document.querySelectorAll('.tabs button')].find(el=>el.textContent.includes('로컬 터미널'));
+          localTab?.querySelector('svg')?.dispatchEvent(new MouseEvent('click',{bubbles:true})); await wait(120);
           const host=[...document.querySelectorAll('.host-row')].find(el=>el.textContent.includes('test-host'));
           host.dispatchEvent(new MouseEvent('dblclick',{bubbles:true})); await wait(150);
           host.dispatchEvent(new MouseEvent('dblclick',{bubbles:true})); await wait(250);
@@ -1099,6 +1132,8 @@ app.whenReady().then(() => {
         result.englishLanguagePreview = settingsCheck.englishPreview;
         result.englishAppUi = settingsCheck.englishAppUi;
         result.englishConnectionUi = settingsCheck.englishConnectionUi;
+        result.defaultLocalSessionOpened =
+          settingsCheck.defaultLocalSessionOpened;
         result.englishMenu =
           englishMenuLabels?.includes("Terminal") &&
           englishMenuLabels?.includes("Edit") &&
@@ -1609,6 +1644,7 @@ app.whenReady().then(() => {
           result.englishLanguagePreview &&
           result.englishAppUi &&
           result.englishConnectionUi &&
+          result.defaultLocalSessionOpened &&
           result.englishMenu &&
           result.koreanLanguageRestored &&
           result.koreanMenu &&
