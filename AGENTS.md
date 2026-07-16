@@ -51,6 +51,14 @@ docs: 설치 및 사용 방법 추가
 - Keep the subject concise, imperative, and without a trailing period.
 - Use a commit body when the motivation or compatibility impact is not obvious.
 - Mark breaking changes with `!` or a `BREAKING CHANGE:` footer.
+- When Codex/ChatGPT assisted with the change, include these co-author trailers in the commit body so GitHub can display the collaboration metadata when possible:
+
+```text
+Co-authored-by: ChatGPT <chatgpt@openai.com>
+Co-authored-by: Codex <codex@openai.com>
+```
+
+- Keep the trailers at the end of the commit message body, after any release-note override or breaking-change footer.
 
 ## Release Notes Language
 
