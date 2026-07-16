@@ -1029,6 +1029,23 @@
   color: #959caa;
   font-size: 11px;
 }
+.update-toast-progress {
+  width: 100%;
+  height: 5px;
+  margin-top: 5px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #2b303c;
+}
+.update-toast-progress span {
+  display: block;
+  height: 100%;
+  min-width: 4px;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #6c5ce7, #54d6a3);
+  transition: width 180ms ease;
+  box-shadow: 0 0 12px rgba(108, 92, 231, 0.4);
+}
 .update-toast button {
   border: 0;
   color: #d9dce3;
@@ -1039,6 +1056,9 @@
   border-radius: 6px !important;
   background: #6c5ce7;
   font-size: 11px;
+}
+.update-toast-download:disabled {
+  opacity: 0.9 !important;
 }
 .update-toast-close {
   width: 24px;

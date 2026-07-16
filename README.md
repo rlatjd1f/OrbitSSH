@@ -184,10 +184,10 @@ open "/Applications/Orbit SSH.app"
 
 Orbit SSH는 실행 시 GitHub의 최신 정식 릴리즈 태그를 확인합니다. `package.json`에 포함된 현재 앱 버전보다 높은 버전이 공개되어 있으면 화면 오른쪽 아래에 업데이트 알림을 표시합니다.
 
-- Apple Silicon Mac에서는 `arm64.dmg`를 선택합니다.
-- Intel Mac에서는 `x64.dmg`를 선택합니다.
+- Apple Silicon Mac에서는 앱이 `arm64.dmg` 업데이트를 자동으로 선택합니다.
+- Intel Mac에서는 앱이 `x64.dmg` 업데이트를 자동으로 선택합니다.
 - **설정 → 앱 업데이트**에서 현재 버전과 Mac 종류를 확인하거나 업데이트를 다시 검사할 수 있습니다.
-- **DMG 받기**를 누르면 macOS의 다운로드 폴더에 설치 파일을 저장한 뒤, Orbit SSH가 현재 앱을 새 버전으로 교체하고 자동으로 다시 시작합니다.
+- **업데이트 설치**를 누르면 Orbit SSH가 백그라운드 임시 폴더에 설치 파일을 받은 뒤, 현재 앱을 새 버전으로 교체하고 자동으로 다시 시작합니다. 사용자가 DMG를 직접 열거나 Applications 폴더로 옮길 필요가 없습니다.
 
 현재 릴리스는 Apple Developer ID 공증이 적용되지 않았으므로 첫 설치 때는 Gatekeeper 경고가 표시될 수 있습니다. 이미 실행 중인 Orbit SSH에서 업데이트할 때는 앱이 종료된 뒤 설치 스크립트가 새 버전을 복사하고 다시 엽니다.
 

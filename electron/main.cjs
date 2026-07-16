@@ -87,11 +87,12 @@ MOUNT_DIR="$(mktemp -d /tmp/orbit-ssh-update.XXXXXX)"
 cleanup() {
   hdiutil detach "$MOUNT_DIR" -quiet >/dev/null 2>&1 || true
   rm -rf "$MOUNT_DIR"
+  rm -f "$DMG_PATH"
   rm -f "$0"
 }
 trap cleanup EXIT
 
-hdiutil attach "$DMG_PATH" -nobrowse -quiet -mountpoint "$MOUNT_DIR"
+hdiutil attach "$DMG_PATH" -nobrowse -noautoopen -quiet -mountpoint "$MOUNT_DIR"
 SOURCE_APP="$MOUNT_DIR/$BUNDLE_NAME"
 if [ ! -d "$SOURCE_APP" ]; then
   SOURCE_APP="$(find "$MOUNT_DIR" -maxdepth 1 -name "*.app" -type d -print -quit)"
@@ -223,7 +224,12 @@ function downloadAvailableUpdate(sender) {
       ),
     );
   const update = availableUpdate;
-  const savePath = path.join(app.getPath("downloads"), update.assetName);
+  const updateDir = path.join(
+    app.getPath("temp"),
+    `orbit-ssh-update-${crypto.randomUUID()}`,
+  );
+  fs.mkdirSync(updateDir, { recursive: true });
+  const savePath = path.join(updateDir, update.assetName);
   return new Promise((resolve, reject) => {
     let started = false;
     let timeout;

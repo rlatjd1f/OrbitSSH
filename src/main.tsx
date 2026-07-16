@@ -790,6 +790,22 @@ function App() {
       );
     }
   };
+  const toastDownloadPercent = Math.max(
+    0,
+    Math.min(100, Math.round(updateStatus.percent ?? 0)),
+  );
+  const updateToastMessage =
+    updateStatus.phase === "installing"
+      ? t("installingUpdate")
+      : updateStatus.phase === "downloading"
+        ? `${t("updateDownloadInProgress")} ${toastDownloadPercent}%`
+        : t("newVersionAvailable");
+  const updateToastAction =
+    updateStatus.phase === "installing"
+      ? t("installingUpdate")
+      : updateStatus.phase === "downloading"
+        ? `${t("downloadingUpdate")} ${toastDownloadPercent}%`
+        : t("downloadDmg");
   useEffect(() => {
     if (!dialog) return;
     const close = (event: KeyboardEvent) => {
@@ -1699,13 +1715,12 @@ function App() {
           <div className="update-toast-icon"><Download /></div>
           <div>
             <b>Orbit SSH v{updateInfo.latestVersion}</b>
-            <span>
-              {updateStatus.phase === "installing"
-                ? t("installingUpdate")
-                : updateStatus.phase === "downloading"
-                ? t("updateDownloadInProgress")
-                : t("newVersionAvailable")}
-            </span>
+            <span>{updateToastMessage}</span>
+            {updateStatus.phase === "downloading" && (
+              <div className="update-toast-progress" aria-hidden="true">
+                <span style={{ width: `${toastDownloadPercent}%` }} />
+              </div>
+            )}
           </div>
           <button
             type="button"
@@ -1717,11 +1732,7 @@ function App() {
               updateStatus.phase === "installing"
             }
           >
-            {updateStatus.phase === "installing"
-              ? t("installingUpdate")
-              : updateStatus.phase === "downloading"
-                ? t("downloadingUpdate")
-                : t("downloadDmg")}
+            {updateToastAction}
           </button>
           <button type="button" className="update-toast-close" aria-label={t("dismissUpdate")} onClick={() => setUpdateDismissed(true)}>
             <X />
