@@ -30,7 +30,10 @@ let cachedUpdateResult = null;
 let lastUpdateCheckAt = 0;
 
 const updateRepository = "rlatjd1f/OrbitSSH";
+const appMenuName = "OrbitSSH";
 const appBundleName = "Orbit SSH.app";
+
+app.setName(appMenuName);
 
 function versionParts(value) {
   return String(value)
@@ -934,13 +937,13 @@ function installApplicationMenu(language = loadSettings().language) {
   const ko = language !== "en";
   const menuText = ko
     ? {
-        about: "Orbit SSH 정보",
+        about: `${appMenuName} 정보`,
         settings: "설정…",
         checkUpdates: "업데이트 확인…",
-        hide: "Orbit SSH 가리기",
+        hide: `${appMenuName} 가리기`,
         hideOthers: "다른 항목 가리기",
         showAll: "모두 보기",
-        quit: "Orbit SSH 종료",
+        quit: `${appMenuName} 종료`,
         terminal: "터미널",
         interrupt: "작업 중단",
         showLog: "단축키 디버그 로그 보기",
@@ -955,13 +958,13 @@ function installApplicationMenu(language = loadSettings().language) {
         zoom: "확대/축소",
       }
     : {
-        about: "About Orbit SSH",
+        about: `About ${appMenuName}`,
         settings: "Settings…",
         checkUpdates: "Check for Updates…",
-        hide: "Hide Orbit SSH",
+        hide: `Hide ${appMenuName}`,
         hideOthers: "Hide Others",
         showAll: "Show All",
-        quit: "Quit Orbit SSH",
+        quit: `Quit ${appMenuName}`,
         terminal: "Terminal",
         interrupt: "Interrupt",
         showLog: "Show Shortcut Debug Log",
@@ -979,7 +982,7 @@ function installApplicationMenu(language = loadSettings().language) {
     ...(process.platform === "darwin"
       ? [
           {
-            label: app.name,
+            label: appMenuName,
             submenu: [
               { role: "about", label: menuText.about },
               {
@@ -1333,6 +1336,8 @@ app.whenReady().then(() => {
         result.defaultTerminalInputEnglish =
           inputSourceSwitchCount > 0 && inputSourceSwitchSuccessCount > 0;
         result.englishMenu =
+          englishMenuLabels?.includes(appMenuName) &&
+          englishMenuLabels?.includes(`About ${appMenuName}`) &&
           englishMenuLabels?.includes("Terminal") &&
           englishMenuLabels?.includes("Edit") &&
           englishMenuLabels?.includes("Window") &&
@@ -1345,6 +1350,8 @@ app.whenReady().then(() => {
           languageReset.koreanPreview &&
           languageReset.closed;
         result.koreanMenu =
+          koreanMenuLabels?.includes(appMenuName) &&
+          koreanMenuLabels?.includes(`${appMenuName} 정보`) &&
           koreanMenuLabels?.includes("터미널") &&
           koreanMenuLabels?.includes("편집") &&
           koreanMenuLabels?.includes("윈도우") &&
