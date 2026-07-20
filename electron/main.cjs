@@ -1530,9 +1530,13 @@ app.whenReady().then(() => {
           const setValue=async(el,value)=>{const setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;setter.call(el,value);el.dispatchEvent(new Event('input',{bubbles:true}));await wait(30)};
           const setSelect=async(el,value)=>{const setter=Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value').set;setter.call(el,value);el.dispatchEvent(new Event('change',{bubbles:true}));await wait(30)};
           const settingsOpened=Boolean(settingsSidebarVisible&&language);
+          const modalSizeBefore=document.querySelector('.settings-modal')?.getBoundingClientRect();
+          const modalStyle=getComputedStyle(document.querySelector('.settings-modal'));
+          const settingsModalResizable=modalStyle.resize==='both'&&modalStyle.overflow==='hidden';
           await setSelect(language,'en'); await wait(50);
           const englishNavPreview=document.querySelector('.settings-modal h2')?.textContent==='Settings'&&document.querySelector('[data-testid="settings-nav-defaults"]')?.textContent.includes('New connection defaults');
           document.querySelector('[data-testid="settings-nav-terminal"]')?.click(); await wait(40);
+          const modalSizeAfterTerminal=document.querySelector('.settings-modal')?.getBoundingClientRect();
           const font=document.querySelector('[data-testid="terminal-font"]');
           const scrollback=document.querySelector('[data-testid="terminal-scrollback"]');
           const defaultScrollback=scrollback?.value==='5000';
@@ -1542,6 +1546,10 @@ app.whenReady().then(() => {
           if(font) await setSelect(font,'Menlo, Monaco, monospace');
           if(scrollback) await setValue(scrollback,'7000');
           document.querySelector('[data-testid="settings-nav-shortcuts"]')?.click(); await wait(40);
+          const modalSizeAfterShortcuts=document.querySelector('.settings-modal')?.getBoundingClientRect();
+          const contentStyle=getComputedStyle(document.querySelector('.settings-content'));
+          const settingsContentScrollable=contentStyle.overflowY==='auto';
+          const settingsFixedSize=Boolean(modalSizeBefore&&modalSizeAfterTerminal&&modalSizeAfterShortcuts&&Math.abs(modalSizeBefore.width-modalSizeAfterTerminal.width)<1&&Math.abs(modalSizeBefore.height-modalSizeAfterTerminal.height)<1&&Math.abs(modalSizeBefore.width-modalSizeAfterShortcuts.width)<1&&Math.abs(modalSizeBefore.height-modalSizeAfterShortcuts.height)<1);
           const splitShortcut=document.querySelector('[data-testid="shortcut-splitTab"]');
           const defaultSplitShortcut=splitShortcut?.dataset.value==='⌘ Cmd+D';
           document.querySelector('[data-testid="shortcut-add-splitTab"]')?.click(); await wait(30);
@@ -1576,7 +1584,7 @@ app.whenReady().then(() => {
           document.querySelector('[data-testid="new-connection"]').click();await wait(30);
           const englishConnectionUi=document.querySelector('.modal h2')?.textContent==='New SSH connection'&&document.querySelector('[data-testid="device-name"]')?.getAttribute('aria-label')==='Device name'&&document.querySelector('.auth-options legend')?.textContent==='Authentication method';
           window.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape'}));await wait(30);
-          return {settingsOpened,settingsSidebarVisible,englishPreview,englishAppUi,englishConnectionUi,defaultLocalSessionOpened,appVersionVisible:appVersion?.textContent.includes('v${app.getVersion()}'),updateAvailableVisible:Boolean(updateResult),fontOptionCount:font?.options.length,defaultScrollback,defaultSplitShortcut,shortcutAdded,shortcutCaptured,shortcutReset,shortcutConflictWarning,shortcutConflictBlocked,shortcutRecaptured,fontColor,labelFontSize,sectionFontSize,settingsClosed:!document.querySelector('.settings-modal')};
+          return {settingsOpened,settingsSidebarVisible,settingsFixedSize,settingsContentScrollable,settingsModalResizable,englishPreview,englishAppUi,englishConnectionUi,defaultLocalSessionOpened,appVersionVisible:appVersion?.textContent.includes('v${app.getVersion()}'),updateAvailableVisible:Boolean(updateResult),fontOptionCount:font?.options.length,defaultScrollback,defaultSplitShortcut,shortcutAdded,shortcutCaptured,shortcutReset,shortcutConflictWarning,shortcutConflictBlocked,shortcutRecaptured,fontColor,labelFontSize,sectionFontSize,settingsClosed:!document.querySelector('.settings-modal')};
         })()`);
         const englishMenuLabels = Menu.getApplicationMenu()?.items.flatMap(
           (item) => [
@@ -1809,6 +1817,9 @@ app.whenReady().then(() => {
         result.appVersionVisible = settingsCheck.appVersionVisible;
         result.updateAvailableVisible = settingsCheck.updateAvailableVisible;
         result.settingsEscapeClosed = settingsEscapeClosed;
+        result.settingsFixedSize = settingsCheck.settingsFixedSize;
+        result.settingsContentScrollable = settingsCheck.settingsContentScrollable;
+        result.settingsModalResizable = settingsCheck.settingsModalResizable;
         const persistedSettings = loadSettings();
         result.settingsPersisted =
           persistedSettings.defaultUser === "global-test-user" &&
@@ -2316,6 +2327,9 @@ app.whenReady().then(() => {
           result.appVersionVisible &&
           result.updateAvailableVisible &&
           result.settingsEscapeClosed &&
+          result.settingsFixedSize &&
+          result.settingsContentScrollable &&
+          result.settingsModalResizable &&
           result.settingsPersisted &&
           result.defaultScrollback &&
           result.defaultSplitShortcut &&
