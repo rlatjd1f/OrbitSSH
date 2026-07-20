@@ -436,14 +436,14 @@ function normalizeShortcut(value, fallback) {
 
 function normalizeShortcutList(value, fallback) {
   const fallbackList = Array.isArray(fallback) ? fallback : [fallback];
+  if (value === undefined || value === null)
+    return fallbackList.map((item) => normalizeShortcut(item, item));
   const values = Array.isArray(value) ? value : [value];
   const normalized = values
     .map((item) => String(item ?? "").trim())
     .filter(Boolean)
     .map((item) => normalizeShortcut(item, fallbackList[0]));
-  return [...new Set(normalized)].filter(Boolean).length
-    ? [...new Set(normalized)].filter(Boolean)
-    : fallbackList.map((item) => normalizeShortcut(item, item));
+  return [...new Set(normalized)].filter(Boolean);
 }
 
 function normalizeShortcuts(value = {}) {
@@ -1551,7 +1551,12 @@ app.whenReady().then(() => {
           await wait(30);
           const shortcutCaptured=[...document.querySelectorAll('[data-testid="shortcut-splitTab"]')][1]?.dataset.value==='Ctrl+Shift+D';
           document.querySelector('[data-testid="shortcut-reset-splitTab"]')?.click(); await wait(30);
-          const shortcutReset=document.querySelectorAll('[data-testid="shortcut-splitTab"]').length===1&&document.querySelector('[data-testid="shortcut-splitTab"]')?.dataset.value==='⌘ Cmd+D';
+          const resetShortcutButton=document.querySelector('[data-testid="shortcut-splitTab"]');
+          const shortcutReset=document.querySelectorAll('[data-testid="shortcut-splitTab"]').length===1&&resetShortcutButton?.dataset.value===''&&resetShortcutButton?.textContent.includes('Click');
+          resetShortcutButton?.click(); await wait(20);
+          document.querySelector('[data-testid="shortcut-splitTab"]')?.dispatchEvent(new KeyboardEvent('keydown',{key:'d',code:'KeyD',metaKey:true,bubbles:true}));
+          await wait(30);
+          const shortcutRecaptured=document.querySelector('[data-testid="shortcut-splitTab"]')?.dataset.value==='⌘ Cmd+D';
           document.querySelector('[data-testid="settings-nav-defaults"]')?.click(); await wait(40);
           const input=document.querySelector('[data-testid="default-user"]');
           if(input) await setValue(input,'global-test-user');
@@ -1566,7 +1571,7 @@ app.whenReady().then(() => {
           document.querySelector('[data-testid="new-connection"]').click();await wait(30);
           const englishConnectionUi=document.querySelector('.modal h2')?.textContent==='New SSH connection'&&document.querySelector('[data-testid="device-name"]')?.getAttribute('aria-label')==='Device name'&&document.querySelector('.auth-options legend')?.textContent==='Authentication method';
           window.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape'}));await wait(30);
-          return {settingsOpened,settingsSidebarVisible,englishPreview,englishAppUi,englishConnectionUi,defaultLocalSessionOpened,appVersionVisible:appVersion?.textContent.includes('v${app.getVersion()}'),updateAvailableVisible:Boolean(updateResult),fontOptionCount:font?.options.length,defaultScrollback,defaultSplitShortcut,shortcutAdded,shortcutCaptured,shortcutReset,fontColor,labelFontSize,sectionFontSize,settingsClosed:!document.querySelector('.settings-modal')};
+          return {settingsOpened,settingsSidebarVisible,englishPreview,englishAppUi,englishConnectionUi,defaultLocalSessionOpened,appVersionVisible:appVersion?.textContent.includes('v${app.getVersion()}'),updateAvailableVisible:Boolean(updateResult),fontOptionCount:font?.options.length,defaultScrollback,defaultSplitShortcut,shortcutAdded,shortcutCaptured,shortcutReset,shortcutRecaptured,fontColor,labelFontSize,sectionFontSize,settingsClosed:!document.querySelector('.settings-modal')};
         })()`);
         const englishMenuLabels = Menu.getApplicationMenu()?.items.flatMap(
           (item) => [
@@ -1810,6 +1815,7 @@ app.whenReady().then(() => {
         result.shortcutAdded = settingsCheck.shortcutAdded;
         result.shortcutCaptured = settingsCheck.shortcutCaptured;
         result.shortcutReset = settingsCheck.shortcutReset;
+        result.shortcutRecaptured = settingsCheck.shortcutRecaptured;
         result.fontComboHasTenOptions = settingsCheck.fontOptionCount === 10;
         result.settingsSelectReadable =
           settingsCheck.fontColor !== "rgb(0, 0, 0)";
@@ -2309,6 +2315,7 @@ app.whenReady().then(() => {
           result.shortcutAdded &&
           result.shortcutCaptured &&
           result.shortcutReset &&
+          result.shortcutRecaptured &&
           result.fontComboHasTenOptions &&
           result.settingsSelectReadable &&
           result.settingsLabelsLarger &&

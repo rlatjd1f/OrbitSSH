@@ -574,7 +574,7 @@ function SettingsForm({
                         data-testid={`shortcut-reset-${key}`}
                         onClick={() => {
                           setActiveShortcutCapture(null);
-                          updateShortcut(key, [...defaultSettings.shortcuts[key]]);
+                          updateShortcut(key, [""]);
                         }}
                       >
                         {t("resetShortcut")}
