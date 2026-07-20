@@ -833,13 +833,35 @@
   flex-direction: column;
   gap: 6px;
 }
-.shortcut-setting-inputs input {
+.shortcut-capture {
   height: 32px;
   border: 1px solid #343946;
   border-radius: 6px;
   background: #0f1218;
   color: #e2e6ef;
   font-size: 13px;
+  text-align: left;
+  padding: 0 10px;
+}
+.shortcut-capture.is-locked {
+  cursor: default;
+  color: #dce2ef;
+  background: #11151d;
+}
+.shortcut-capture.is-empty {
+  cursor: pointer;
+  color: #98a2b3;
+  border-style: dashed;
+}
+.shortcut-capture.is-empty:hover,
+.shortcut-capture.is-capturing {
+  border-color: #7b61ff;
+  color: #fff;
+  background: rgba(123, 97, 255, 0.12);
+}
+.shortcut-capture:focus-visible {
+  outline: 2px solid rgba(123, 97, 255, 0.45);
+  outline-offset: 2px;
 }
 .shortcut-setting-button {
   height: 32px;

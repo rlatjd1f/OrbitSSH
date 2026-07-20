@@ -12,6 +12,8 @@ const messages = {
     shortcuts: "단축키",
     shortcutFormatHelp:
       "예: ⌘ Cmd+D, Ctrl+T, Ctrl+[, ⌘ Cmd/Ctrl+W 형식으로 입력합니다.",
+    shortcutClickToSet: "클릭 후 단축키 입력",
+    shortcutPressKeys: "누른 키를 인식 중...",
     resetShortcut: "초기화",
     addShortcut: "추가",
     closeTabShortcut: "활성 패널/탭 닫기",
@@ -153,6 +155,8 @@ const messages = {
     shortcuts: "Shortcuts",
     shortcutFormatHelp:
       "Enter shortcuts like ⌘ Cmd+D, Ctrl+T, Ctrl+[, or ⌘ Cmd/Ctrl+W.",
+    shortcutClickToSet: "Click and press keys",
+    shortcutPressKeys: "Listening for keys...",
     resetShortcut: "Reset",
     addShortcut: "Add",
     closeTabShortcut: "Close active pane/tab",

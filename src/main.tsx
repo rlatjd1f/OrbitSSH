@@ -110,8 +110,30 @@ const displayShortcut = (value: string) =>
     .replaceAll("CommandOrControl", "⌘ Cmd/Ctrl")
     .replaceAll("Command", "⌘ Cmd")
     .replaceAll("Control", "Ctrl");
-const editableShortcut = (value: string) =>
-  displayShortcut(value).replaceAll("⌘ Cmd", "⌘ Cmd");
+const shortcutCaptureId = (
+  key: keyof AppSettings["shortcuts"],
+  index: number,
+) => `${key}-${index}`;
+const shortcutFromKeyboardEvent = (event: React.KeyboardEvent) => {
+  if (["Control", "Meta", "Shift", "Alt"].includes(event.key)) return "";
+  const modifiers = [
+    event.metaKey ? "Command" : "",
+    event.ctrlKey ? "Control" : "",
+    event.altKey ? "Alt" : "",
+    event.shiftKey ? "Shift" : "",
+  ].filter(Boolean);
+  const keyAliases: Record<string, string> = {
+    " ": "Space",
+    ArrowUp: "Up",
+    ArrowDown: "Down",
+    ArrowLeft: "Left",
+    ArrowRight: "Right",
+  };
+  const key =
+    keyAliases[event.key] ??
+    (event.key.length === 1 ? event.key.toUpperCase() : event.key);
+  return [...modifiers, key].join("+");
+};
 
 function TerminalPane({
   session,
@@ -327,6 +349,16 @@ function SettingsForm({
   const [activeSection, setActiveSection] = useState<
     "general" | "terminal" | "shortcuts" | "defaults" | "ssh" | "updates"
   >("general");
+  const [activeShortcutCapture, setActiveShortcutCapture] = useState<
+    string | null
+  >(null);
+  const shortcutCaptureRefs = useRef<Record<string, HTMLButtonElement | null>>(
+    {},
+  );
+  useEffect(() => {
+    if (!activeShortcutCapture) return;
+    shortcutCaptureRefs.current[activeShortcutCapture]?.focus();
+  }, [activeShortcutCapture]);
   const t = (key: MessageKey, values?: Record<string, string | number>) =>
     translate(language, key, values);
   const update = <K extends keyof AppSettings>(key: K, next: AppSettings[K]) =>
@@ -487,44 +519,83 @@ function SettingsForm({
               <h3>{t("shortcuts")}</h3>
               <p className="settings-help">{t("shortcutFormatHelp")}</p>
               <div className="shortcut-settings-list">
-                {shortcutFields.map(([key, labelKey]) => (
-                  <div className="shortcut-setting-row" key={key}>
-                    <span className="shortcut-setting-label">{t(labelKey)}</span>
-                    <div className="shortcut-setting-inputs">
-                      {shortcutValues(value.shortcuts, key).map((shortcut, index) => (
-                        <input
-                          key={`${key}-${index}`}
-                          data-testid={`shortcut-${key}`}
-                          aria-label={`${t(labelKey)} ${index + 1}`}
-                          value={displayShortcut(shortcut)}
-                          onChange={(event) => {
-                            const next = [...shortcutValues(value.shortcuts, key)];
-                            next[index] = event.target.value;
-                            updateShortcut(key, next);
-                          }}
-                        />
-                      ))}
+                {shortcutFields.map(([key, labelKey]) => {
+                  const values = shortcutValues(value.shortcuts, key);
+                  return (
+                    <div className="shortcut-setting-row" key={key}>
+                      <span className="shortcut-setting-label">{t(labelKey)}</span>
+                      <div className="shortcut-setting-inputs">
+                        {values.map((shortcut, index) => {
+                          const captureId = shortcutCaptureId(key, index);
+                          const isEmpty = !shortcut.trim();
+                          const isCapturing = activeShortcutCapture === captureId;
+                          return (
+                            <button
+                              key={captureId}
+                              type="button"
+                              ref={(element) => {
+                                shortcutCaptureRefs.current[captureId] = element;
+                              }}
+                              className={`shortcut-capture ${isEmpty ? "is-empty" : "is-locked"} ${isCapturing ? "is-capturing" : ""}`}
+                              data-testid={`shortcut-${key}`}
+                              aria-label={`${t(labelKey)} ${index + 1}`}
+                              data-value={displayShortcut(shortcut)}
+                              onClick={() => {
+                                if (isEmpty) setActiveShortcutCapture(captureId);
+                              }}
+                              onKeyDown={(event) => {
+                                if (!isEmpty) return;
+                                event.preventDefault();
+                                event.stopPropagation();
+                                if (event.key === "Escape") {
+                                  setActiveShortcutCapture(null);
+                                  return;
+                                }
+                                const nextShortcut = shortcutFromKeyboardEvent(event);
+                                if (!nextShortcut) return;
+                                const next = [...values];
+                                next[index] = nextShortcut;
+                                updateShortcut(key, next);
+                                setActiveShortcutCapture(null);
+                              }}
+                            >
+                              {isEmpty
+                                ? isCapturing
+                                  ? t("shortcutPressKeys")
+                                  : t("shortcutClickToSet")
+                                : displayShortcut(shortcut)}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <button
+                        type="button"
+                        className="shortcut-setting-button"
+                        data-testid={`shortcut-reset-${key}`}
+                        onClick={() => {
+                          setActiveShortcutCapture(null);
+                          updateShortcut(key, [...defaultSettings.shortcuts[key]]);
+                        }}
+                      >
+                        {t("resetShortcut")}
+                      </button>
+                      <button
+                        type="button"
+                        className="shortcut-setting-button"
+                        data-testid={`shortcut-add-${key}`}
+                        onClick={() => {
+                          const next = values.some((shortcut) => !shortcut.trim())
+                            ? values
+                            : [...values, ""];
+                          updateShortcut(key, next);
+                          setActiveShortcutCapture(shortcutCaptureId(key, next.length - 1));
+                        }}
+                      >
+                        {t("addShortcut")}
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      className="shortcut-setting-button"
-                      data-testid={`shortcut-reset-${key}`}
-                      onClick={() => updateShortcut(key, defaultSettings.shortcuts[key])}
-                    >
-                      {t("resetShortcut")}
-                    </button>
-                    <button
-                      type="button"
-                      className="shortcut-setting-button"
-                      data-testid={`shortcut-add-${key}`}
-                      onClick={() =>
-                        updateShortcut(key, [...shortcutValues(value.shortcuts, key), ""])
-                      }
-                    >
-                      {t("addShortcut")}
-                    </button>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </section>
           )}

@@ -1543,12 +1543,15 @@ app.whenReady().then(() => {
           if(scrollback) await setValue(scrollback,'7000');
           document.querySelector('[data-testid="settings-nav-shortcuts"]')?.click(); await wait(40);
           const splitShortcut=document.querySelector('[data-testid="shortcut-splitTab"]');
-          const defaultSplitShortcut=splitShortcut?.value==='⌘ Cmd+D';
+          const defaultSplitShortcut=splitShortcut?.dataset.value==='⌘ Cmd+D';
           document.querySelector('[data-testid="shortcut-add-splitTab"]')?.click(); await wait(30);
-          const shortcutAdded=document.querySelectorAll('[data-testid="shortcut-splitTab"]').length===2;
-          if(splitShortcut) await setValue(splitShortcut,'Ctrl+Shift+D');
+          const addedShortcutButtons=[...document.querySelectorAll('[data-testid="shortcut-splitTab"]')];
+          const shortcutAdded=addedShortcutButtons.length===2;
+          addedShortcutButtons[1]?.dispatchEvent(new KeyboardEvent('keydown',{key:'d',code:'KeyD',ctrlKey:true,shiftKey:true,bubbles:true}));
+          await wait(30);
+          const shortcutCaptured=[...document.querySelectorAll('[data-testid="shortcut-splitTab"]')][1]?.dataset.value==='Ctrl+Shift+D';
           document.querySelector('[data-testid="shortcut-reset-splitTab"]')?.click(); await wait(30);
-          const shortcutReset=document.querySelectorAll('[data-testid="shortcut-splitTab"]').length===1&&document.querySelector('[data-testid="shortcut-splitTab"]')?.value==='⌘ Cmd+D';
+          const shortcutReset=document.querySelectorAll('[data-testid="shortcut-splitTab"]').length===1&&document.querySelector('[data-testid="shortcut-splitTab"]')?.dataset.value==='⌘ Cmd+D';
           document.querySelector('[data-testid="settings-nav-defaults"]')?.click(); await wait(40);
           const input=document.querySelector('[data-testid="default-user"]');
           if(input) await setValue(input,'global-test-user');
@@ -1563,7 +1566,7 @@ app.whenReady().then(() => {
           document.querySelector('[data-testid="new-connection"]').click();await wait(30);
           const englishConnectionUi=document.querySelector('.modal h2')?.textContent==='New SSH connection'&&document.querySelector('[data-testid="device-name"]')?.getAttribute('aria-label')==='Device name'&&document.querySelector('.auth-options legend')?.textContent==='Authentication method';
           window.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape'}));await wait(30);
-          return {settingsOpened,settingsSidebarVisible,englishPreview,englishAppUi,englishConnectionUi,defaultLocalSessionOpened,appVersionVisible:appVersion?.textContent.includes('v${app.getVersion()}'),updateAvailableVisible:Boolean(updateResult),fontOptionCount:font?.options.length,defaultScrollback,defaultSplitShortcut,shortcutAdded,shortcutReset,fontColor,labelFontSize,sectionFontSize,settingsClosed:!document.querySelector('.settings-modal')};
+          return {settingsOpened,settingsSidebarVisible,englishPreview,englishAppUi,englishConnectionUi,defaultLocalSessionOpened,appVersionVisible:appVersion?.textContent.includes('v${app.getVersion()}'),updateAvailableVisible:Boolean(updateResult),fontOptionCount:font?.options.length,defaultScrollback,defaultSplitShortcut,shortcutAdded,shortcutCaptured,shortcutReset,fontColor,labelFontSize,sectionFontSize,settingsClosed:!document.querySelector('.settings-modal')};
         })()`);
         const englishMenuLabels = Menu.getApplicationMenu()?.items.flatMap(
           (item) => [
@@ -1805,6 +1808,7 @@ app.whenReady().then(() => {
         result.defaultScrollback = settingsCheck.defaultScrollback;
         result.defaultSplitShortcut = settingsCheck.defaultSplitShortcut;
         result.shortcutAdded = settingsCheck.shortcutAdded;
+        result.shortcutCaptured = settingsCheck.shortcutCaptured;
         result.shortcutReset = settingsCheck.shortcutReset;
         result.fontComboHasTenOptions = settingsCheck.fontOptionCount === 10;
         result.settingsSelectReadable =
@@ -2303,6 +2307,7 @@ app.whenReady().then(() => {
           result.defaultScrollback &&
           result.defaultSplitShortcut &&
           result.shortcutAdded &&
+          result.shortcutCaptured &&
           result.shortcutReset &&
           result.fontComboHasTenOptions &&
           result.settingsSelectReadable &&
