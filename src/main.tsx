@@ -134,6 +134,20 @@ const shortcutFromKeyboardEvent = (event: React.KeyboardEvent) => {
     (event.key.length === 1 ? event.key.toUpperCase() : event.key);
   return [...modifiers, key].join("+");
 };
+const shortcutConflict = (
+  shortcuts: AppSettings["shortcuts"],
+  nextShortcut: string,
+  targetKey: keyof AppSettings["shortcuts"],
+  targetIndex: number,
+) =>
+  shortcutFields.some(([key]) =>
+    shortcutValues(shortcuts, key).some(
+      (shortcut, index) =>
+        Boolean(shortcut.trim()) &&
+        displayShortcut(shortcut) === displayShortcut(nextShortcut) &&
+        (key !== targetKey || index !== targetIndex),
+    ),
+  );
 
 function TerminalPane({
   session,
@@ -352,6 +366,7 @@ function SettingsForm({
   const [activeShortcutCapture, setActiveShortcutCapture] = useState<
     string | null
   >(null);
+  const [shortcutWarning, setShortcutWarning] = useState("");
   const shortcutCaptureRefs = useRef<Record<string, HTMLButtonElement | null>>(
     {},
   );
@@ -371,6 +386,10 @@ function SettingsForm({
       ...value,
       shortcuts: { ...value.shortcuts, [key]: next },
     });
+  const warnShortcutConflict = (shortcut: string) =>
+    setShortcutWarning(
+      t("shortcutAlreadyExists", { shortcut: displayShortcut(shortcut) }),
+    );
   const isDownloading = updateStatus.phase === "downloading";
   const isInstalling = updateStatus.phase === "installing";
   const isUpdateBusy = isDownloading || isInstalling;
@@ -518,6 +537,11 @@ function SettingsForm({
             <section className="settings-section">
               <h3>{t("shortcuts")}</h3>
               <p className="settings-help">{t("shortcutFormatHelp")}</p>
+              {shortcutWarning && (
+                <p className="shortcut-warning" data-testid="shortcut-warning">
+                  {shortcutWarning}
+                </p>
+              )}
               <div className="shortcut-settings-list">
                 {shortcutFields.map(([key, labelKey]) => {
                   const values = shortcutValues(value.shortcuts, key);
@@ -541,7 +565,10 @@ function SettingsForm({
                               aria-label={`${t(labelKey)} ${index + 1}`}
                               data-value={displayShortcut(shortcut)}
                               onClick={() => {
-                                if (isEmpty) setActiveShortcutCapture(captureId);
+                                if (isEmpty) {
+                                  setShortcutWarning("");
+                                  setActiveShortcutCapture(captureId);
+                                }
                               }}
                               onKeyDown={(event) => {
                                 if (!isEmpty) return;
@@ -553,9 +580,21 @@ function SettingsForm({
                                 }
                                 const nextShortcut = shortcutFromKeyboardEvent(event);
                                 if (!nextShortcut) return;
+                                if (
+                                  shortcutConflict(
+                                    value.shortcuts,
+                                    nextShortcut,
+                                    key,
+                                    index,
+                                  )
+                                ) {
+                                  warnShortcutConflict(nextShortcut);
+                                  return;
+                                }
                                 const next = [...values];
                                 next[index] = nextShortcut;
                                 updateShortcut(key, next);
+                                setShortcutWarning("");
                                 setActiveShortcutCapture(null);
                               }}
                             >
@@ -574,6 +613,7 @@ function SettingsForm({
                         data-testid={`shortcut-reset-${key}`}
                         onClick={() => {
                           setActiveShortcutCapture(null);
+                          setShortcutWarning("");
                           updateShortcut(key, [""]);
                         }}
                       >
@@ -588,6 +628,7 @@ function SettingsForm({
                             ? values
                             : [...values, ""];
                           updateShortcut(key, next);
+                          setShortcutWarning("");
                           setActiveShortcutCapture(shortcutCaptureId(key, next.length - 1));
                         }}
                       >

@@ -1554,6 +1554,11 @@ app.whenReady().then(() => {
           const resetShortcutButton=document.querySelector('[data-testid="shortcut-splitTab"]');
           const shortcutReset=document.querySelectorAll('[data-testid="shortcut-splitTab"]').length===1&&resetShortcutButton?.dataset.value===''&&resetShortcutButton?.textContent.includes('Click');
           resetShortcutButton?.click(); await wait(20);
+          document.querySelector('[data-testid="shortcut-splitTab"]')?.dispatchEvent(new KeyboardEvent('keydown',{key:'t',code:'KeyT',ctrlKey:true,bubbles:true}));
+          await wait(30);
+          const shortcutConflictWarning=document.querySelector('[data-testid="shortcut-warning"]')?.textContent.includes('Ctrl+T');
+          const shortcutConflictBlocked=document.querySelector('[data-testid="shortcut-splitTab"]')?.dataset.value==='';
+          resetShortcutButton?.click(); await wait(20);
           document.querySelector('[data-testid="shortcut-splitTab"]')?.dispatchEvent(new KeyboardEvent('keydown',{key:'d',code:'KeyD',metaKey:true,bubbles:true}));
           await wait(30);
           const shortcutRecaptured=document.querySelector('[data-testid="shortcut-splitTab"]')?.dataset.value==='⌘ Cmd+D';
@@ -1571,7 +1576,7 @@ app.whenReady().then(() => {
           document.querySelector('[data-testid="new-connection"]').click();await wait(30);
           const englishConnectionUi=document.querySelector('.modal h2')?.textContent==='New SSH connection'&&document.querySelector('[data-testid="device-name"]')?.getAttribute('aria-label')==='Device name'&&document.querySelector('.auth-options legend')?.textContent==='Authentication method';
           window.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape'}));await wait(30);
-          return {settingsOpened,settingsSidebarVisible,englishPreview,englishAppUi,englishConnectionUi,defaultLocalSessionOpened,appVersionVisible:appVersion?.textContent.includes('v${app.getVersion()}'),updateAvailableVisible:Boolean(updateResult),fontOptionCount:font?.options.length,defaultScrollback,defaultSplitShortcut,shortcutAdded,shortcutCaptured,shortcutReset,shortcutRecaptured,fontColor,labelFontSize,sectionFontSize,settingsClosed:!document.querySelector('.settings-modal')};
+          return {settingsOpened,settingsSidebarVisible,englishPreview,englishAppUi,englishConnectionUi,defaultLocalSessionOpened,appVersionVisible:appVersion?.textContent.includes('v${app.getVersion()}'),updateAvailableVisible:Boolean(updateResult),fontOptionCount:font?.options.length,defaultScrollback,defaultSplitShortcut,shortcutAdded,shortcutCaptured,shortcutReset,shortcutConflictWarning,shortcutConflictBlocked,shortcutRecaptured,fontColor,labelFontSize,sectionFontSize,settingsClosed:!document.querySelector('.settings-modal')};
         })()`);
         const englishMenuLabels = Menu.getApplicationMenu()?.items.flatMap(
           (item) => [
@@ -1815,6 +1820,8 @@ app.whenReady().then(() => {
         result.shortcutAdded = settingsCheck.shortcutAdded;
         result.shortcutCaptured = settingsCheck.shortcutCaptured;
         result.shortcutReset = settingsCheck.shortcutReset;
+        result.shortcutConflictWarning = settingsCheck.shortcutConflictWarning;
+        result.shortcutConflictBlocked = settingsCheck.shortcutConflictBlocked;
         result.shortcutRecaptured = settingsCheck.shortcutRecaptured;
         result.fontComboHasTenOptions = settingsCheck.fontOptionCount === 10;
         result.settingsSelectReadable =
@@ -2315,6 +2322,8 @@ app.whenReady().then(() => {
           result.shortcutAdded &&
           result.shortcutCaptured &&
           result.shortcutReset &&
+          result.shortcutConflictWarning &&
+          result.shortcutConflictBlocked &&
           result.shortcutRecaptured &&
           result.fontComboHasTenOptions &&
           result.settingsSelectReadable &&

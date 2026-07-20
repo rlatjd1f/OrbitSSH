@@ -810,6 +810,16 @@
   flex-direction: column;
   gap: 8px;
 }
+.shortcut-warning {
+  margin: 8px 0 10px;
+  padding: 9px 10px;
+  border: 1px solid rgba(255, 183, 77, 0.42);
+  border-radius: 8px;
+  background: rgba(255, 183, 77, 0.12);
+  color: #ffd58f;
+  font-size: 12px;
+  font-weight: 700;
+}
 .shortcut-setting-row {
   display: grid;
   grid-template-columns: minmax(130px, 1.15fr) minmax(180px, 1.6fr) auto auto;
