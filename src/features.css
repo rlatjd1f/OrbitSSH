@@ -805,6 +805,55 @@
 .settings-modal .settings-grid select {
   font-size: 13px;
 }
+.shortcut-settings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.shortcut-setting-row {
+  display: grid;
+  grid-template-columns: minmax(130px, 1.15fr) minmax(180px, 1.6fr) auto auto;
+  gap: 8px;
+  align-items: start;
+  padding: 9px;
+  border: 1px solid #303540;
+  border-radius: 8px;
+  background: #111319;
+}
+.shortcut-setting-label {
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  color: #c8ced9;
+  font-size: 12px;
+  font-weight: 700;
+}
+.shortcut-setting-inputs {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.shortcut-setting-inputs input {
+  height: 32px;
+  border: 1px solid #343946;
+  border-radius: 6px;
+  background: #0f1218;
+  color: #e2e6ef;
+  font-size: 13px;
+}
+.shortcut-setting-button {
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid #343946;
+  border-radius: 6px;
+  background: #1a1d25;
+  color: #c9ced8;
+  font-size: 12px;
+}
+.shortcut-setting-button:hover {
+  border-color: #565e70;
+  color: #fff;
+}
 .settings-grid .setting-toggle {
   height: 54px;
   margin: 13px 0;

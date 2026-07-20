@@ -35,7 +35,7 @@ type AppSettings = {
     | "duplicateTab"
     | "openSettings"
     | "nextTab",
-    string
+    string[]
   >;
 };
 type UpdateInfo = {

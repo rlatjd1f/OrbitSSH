@@ -360,15 +360,15 @@ const defaultSettings = {
   defaultAuthType: "key",
   keepAliveInterval: 30,
   shortcuts: {
-    closeTab: "CommandOrControl+W",
-    interrupt: "Control+C",
-    splitTab: "Command+D",
-    openSession: "Control+N",
-    previousPane: "Control+[",
-    nextPane: "Control+]",
-    duplicateTab: "Control+T",
-    openSettings: "Command+,",
-    nextTab: "Control+Tab",
+    closeTab: ["CommandOrControl+W"],
+    interrupt: ["Control+C"],
+    splitTab: ["Command+D"],
+    openSession: ["Control+N"],
+    previousPane: ["Control+["],
+    nextPane: ["Control+]"],
+    duplicateTab: ["Control+T"],
+    openSettings: ["Command+,"],
+    nextTab: ["Control+Tab"],
   },
 };
 const storePath = () => path.join(app.getPath("userData"), "connections.json");
@@ -381,13 +381,18 @@ const clamp = (value, min, max, fallback) => {
 };
 
 function normalizeShortcut(value, fallback) {
+  const fallbackValue = Array.isArray(fallback) ? fallback[0] : fallback;
   const raw = String(value ?? "").trim();
-  const source = raw || fallback;
+  const source = (raw || fallbackValue)
+    .replaceAll("⌘ Cmd/Ctrl", "CommandOrControl")
+    .replaceAll("Cmd/Ctrl", "CommandOrControl")
+    .replaceAll("⌘ Cmd", "Command")
+    .replaceAll("⌘", "Command+");
   const parts = source
     .split("+")
     .map((part) => part.trim())
     .filter(Boolean);
-  if (!parts.length) return fallback;
+  if (!parts.length) return fallbackValue;
   const key = parts.pop();
   const modifiers = [];
   const seen = new Set();
@@ -425,28 +430,54 @@ function normalizeShortcut(value, fallback) {
     (String(key).length === 1
       ? String(key).toUpperCase()
       : String(key).replace(/\s+/g, ""));
-  if (!normalizedKey) return fallback;
+  if (!normalizedKey) return fallbackValue;
   return [...modifiers, normalizedKey].join("+");
+}
+
+function normalizeShortcutList(value, fallback) {
+  const fallbackList = Array.isArray(fallback) ? fallback : [fallback];
+  const values = Array.isArray(value) ? value : [value];
+  const normalized = values
+    .map((item) => String(item ?? "").trim())
+    .filter(Boolean)
+    .map((item) => normalizeShortcut(item, fallbackList[0]));
+  return [...new Set(normalized)].filter(Boolean).length
+    ? [...new Set(normalized)].filter(Boolean)
+    : fallbackList.map((item) => normalizeShortcut(item, item));
 }
 
 function normalizeShortcuts(value = {}) {
   return Object.fromEntries(
     Object.entries(defaultSettings.shortcuts).map(([key, fallback]) => [
       key,
-      normalizeShortcut(value?.[key], fallback),
+      normalizeShortcutList(value?.[key], fallback),
     ]),
   );
 }
 
 function electronAccelerator(shortcut) {
-  return normalizeShortcut(shortcut, shortcut).replace(
+  const first = Array.isArray(shortcut) ? shortcut[0] : shortcut;
+  return normalizeShortcut(first, first).replace(
     "CommandOrControl",
     "CmdOrCtrl",
   );
 }
 
+function displayShortcut(shortcut) {
+  return normalizeShortcut(shortcut, shortcut)
+    .replaceAll("CommandOrControl", "⌘ Cmd/Ctrl")
+    .replaceAll("Command", "⌘ Cmd")
+    .replaceAll("Control", "Ctrl");
+}
+
+function displayShortcutList(shortcut) {
+  const list = Array.isArray(shortcut) ? shortcut : [shortcut];
+  return list.map(displayShortcut).join(", ");
+}
+
 function shortcutParts(shortcut) {
-  const parts = normalizeShortcut(shortcut, shortcut).split("+");
+  const first = Array.isArray(shortcut) ? shortcut[0] : shortcut;
+  const parts = normalizeShortcut(first, first).split("+");
   const key = parts.pop() ?? "";
   const modifiers = new Set(parts);
   return {
@@ -467,6 +498,8 @@ function inputKey(input) {
 }
 
 function matchesShortcut(input, shortcut, context) {
+  if (Array.isArray(shortcut))
+    return shortcut.some((item) => matchesShortcut(input, item, context));
   const parsed = shortcutParts(shortcut);
   if (inputKey(input) !== parsed.key) return false;
   if (Boolean(input.shift) !== parsed.shift) return false;
@@ -903,18 +936,23 @@ function closeTerminal(sessionId) {
 }
 
 function registerTerminalShortcut() {
-  const accelerator = electronAccelerator(loadSettings().shortcuts.interrupt);
+  const accelerators = normalizeShortcutList(
+    loadSettings().shortcuts.interrupt,
+    defaultSettings.shortcuts.interrupt,
+  ).map(electronAccelerator);
   globalShortcut.unregisterAll();
-  const registered = globalShortcut.register(accelerator, () => {
-    logShortcut("global-shortcut:invoked", {
-      focused: Boolean(mainWindow?.isFocused()),
-      modalOpen,
-      accelerator,
-    });
-    if (modalOpen) return;
-    interruptActiveTerminal();
-  });
-  logShortcut("global-shortcut:registered", { registered, accelerator });
+  const registered = accelerators.map((accelerator) =>
+    globalShortcut.register(accelerator, () => {
+      logShortcut("global-shortcut:invoked", {
+        focused: Boolean(mainWindow?.isFocused()),
+        modalOpen,
+        accelerator,
+      });
+      if (modalOpen) return;
+      interruptActiveTerminal();
+    }),
+  );
+  logShortcut("global-shortcut:registered", { registered, accelerators });
 }
 
 function unregisterTerminalShortcut() {
@@ -1340,7 +1378,7 @@ function installApplicationMenu(language = loadSettings().language) {
       submenu: [
         {
           label: menuText.interrupt,
-          sublabel: shortcuts.interrupt,
+          sublabel: displayShortcutList(shortcuts.interrupt),
           click: () => {
             logShortcut("menu:interrupt-clicked");
             interruptActiveTerminal();
@@ -1505,7 +1543,12 @@ app.whenReady().then(() => {
           if(scrollback) await setValue(scrollback,'7000');
           document.querySelector('[data-testid="settings-nav-shortcuts"]')?.click(); await wait(40);
           const splitShortcut=document.querySelector('[data-testid="shortcut-splitTab"]');
-          const defaultSplitShortcut=splitShortcut?.value==='Command+D';
+          const defaultSplitShortcut=splitShortcut?.value==='⌘ Cmd+D';
+          document.querySelector('[data-testid="shortcut-add-splitTab"]')?.click(); await wait(30);
+          const shortcutAdded=document.querySelectorAll('[data-testid="shortcut-splitTab"]').length===2;
+          if(splitShortcut) await setValue(splitShortcut,'Ctrl+Shift+D');
+          document.querySelector('[data-testid="shortcut-reset-splitTab"]')?.click(); await wait(30);
+          const shortcutReset=document.querySelectorAll('[data-testid="shortcut-splitTab"]').length===1&&document.querySelector('[data-testid="shortcut-splitTab"]')?.value==='⌘ Cmd+D';
           document.querySelector('[data-testid="settings-nav-defaults"]')?.click(); await wait(40);
           const input=document.querySelector('[data-testid="default-user"]');
           if(input) await setValue(input,'global-test-user');
@@ -1520,7 +1563,7 @@ app.whenReady().then(() => {
           document.querySelector('[data-testid="new-connection"]').click();await wait(30);
           const englishConnectionUi=document.querySelector('.modal h2')?.textContent==='New SSH connection'&&document.querySelector('[data-testid="device-name"]')?.getAttribute('aria-label')==='Device name'&&document.querySelector('.auth-options legend')?.textContent==='Authentication method';
           window.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape'}));await wait(30);
-          return {settingsOpened,settingsSidebarVisible,englishPreview,englishAppUi,englishConnectionUi,defaultLocalSessionOpened,appVersionVisible:appVersion?.textContent.includes('v${app.getVersion()}'),updateAvailableVisible:Boolean(updateResult),fontOptionCount:font?.options.length,defaultScrollback,defaultSplitShortcut,fontColor,labelFontSize,sectionFontSize,settingsClosed:!document.querySelector('.settings-modal')};
+          return {settingsOpened,settingsSidebarVisible,englishPreview,englishAppUi,englishConnectionUi,defaultLocalSessionOpened,appVersionVisible:appVersion?.textContent.includes('v${app.getVersion()}'),updateAvailableVisible:Boolean(updateResult),fontOptionCount:font?.options.length,defaultScrollback,defaultSplitShortcut,shortcutAdded,shortcutReset,fontColor,labelFontSize,sectionFontSize,settingsClosed:!document.querySelector('.settings-modal')};
         })()`);
         const englishMenuLabels = Menu.getApplicationMenu()?.items.flatMap(
           (item) => [
@@ -1761,6 +1804,8 @@ app.whenReady().then(() => {
           persistedSettings.scrollback === 7000;
         result.defaultScrollback = settingsCheck.defaultScrollback;
         result.defaultSplitShortcut = settingsCheck.defaultSplitShortcut;
+        result.shortcutAdded = settingsCheck.shortcutAdded;
+        result.shortcutReset = settingsCheck.shortcutReset;
         result.fontComboHasTenOptions = settingsCheck.fontOptionCount === 10;
         result.settingsSelectReadable =
           settingsCheck.fontColor !== "rgb(0, 0, 0)";
@@ -2257,6 +2302,8 @@ app.whenReady().then(() => {
           result.settingsPersisted &&
           result.defaultScrollback &&
           result.defaultSplitShortcut &&
+          result.shortcutAdded &&
+          result.shortcutReset &&
           result.fontComboHasTenOptions &&
           result.settingsSelectReadable &&
           result.settingsLabelsLarger &&

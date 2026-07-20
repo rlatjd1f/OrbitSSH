@@ -11,7 +11,9 @@ const messages = {
     terminal: "터미널",
     shortcuts: "단축키",
     shortcutFormatHelp:
-      "예: Command+D, Ctrl+T, Control+[, CommandOrControl+W 형식으로 입력합니다.",
+      "예: ⌘ Cmd+D, Ctrl+T, Ctrl+[, ⌘ Cmd/Ctrl+W 형식으로 입력합니다.",
+    resetShortcut: "초기화",
+    addShortcut: "추가",
     closeTabShortcut: "활성 패널/탭 닫기",
     interruptShortcut: "터미널 작업 중단",
     splitTabShortcut: "현재 탭 분할",
@@ -150,7 +152,9 @@ const messages = {
     terminal: "Terminal",
     shortcuts: "Shortcuts",
     shortcutFormatHelp:
-      "Enter shortcuts like Command+D, Ctrl+T, Control+[, or CommandOrControl+W.",
+      "Enter shortcuts like ⌘ Cmd+D, Ctrl+T, Ctrl+[, or ⌘ Cmd/Ctrl+W.",
+    resetShortcut: "Reset",
+    addShortcut: "Add",
     closeTabShortcut: "Close active pane/tab",
     interruptShortcut: "Interrupt terminal task",
     splitTabShortcut: "Split current tab",

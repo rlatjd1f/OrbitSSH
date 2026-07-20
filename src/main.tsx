@@ -61,15 +61,15 @@ const defaultSettings: AppSettings = {
   defaultAuthType: "key",
   keepAliveInterval: 30,
   shortcuts: {
-    closeTab: "CommandOrControl+W",
-    interrupt: "Control+C",
-    splitTab: "Command+D",
-    openSession: "Control+N",
-    previousPane: "Control+[",
-    nextPane: "Control+]",
-    duplicateTab: "Control+T",
-    openSettings: "Command+,",
-    nextTab: "Control+Tab",
+    closeTab: ["CommandOrControl+W"],
+    interrupt: ["Control+C"],
+    splitTab: ["Command+D"],
+    openSession: ["Control+N"],
+    previousPane: ["Control+["],
+    nextPane: ["Control+]"],
+    duplicateTab: ["Control+T"],
+    openSettings: ["Command+,"],
+    nextTab: ["Control+Tab"],
   },
 };
 const colors = ["#ff7a59", "#49c6a1", "#5ea0ff", "#ae8cff"];
@@ -97,6 +97,21 @@ const shortcutFields = [
   ["openSettings", "openSettingsShortcut"],
   ["nextTab", "nextTabShortcut"],
 ] as const;
+const shortcutValues = (
+  shortcuts: AppSettings["shortcuts"],
+  key: keyof AppSettings["shortcuts"],
+) => {
+  const value = shortcuts[key];
+  if (Array.isArray(value)) return value.length ? value : [""];
+  return value ? [value] : [""];
+};
+const displayShortcut = (value: string) =>
+  value
+    .replaceAll("CommandOrControl", "⌘ Cmd/Ctrl")
+    .replaceAll("Command", "⌘ Cmd")
+    .replaceAll("Control", "Ctrl");
+const editableShortcut = (value: string) =>
+  displayShortcut(value).replaceAll("⌘ Cmd", "⌘ Cmd");
 
 function TerminalPane({
   session,
@@ -318,7 +333,7 @@ function SettingsForm({
     onChange({ ...value, [key]: next });
   const updateShortcut = (
     key: keyof AppSettings["shortcuts"],
-    next: string,
+    next: string[],
   ) =>
     onChange({
       ...value,
@@ -471,17 +486,44 @@ function SettingsForm({
             <section className="settings-section">
               <h3>{t("shortcuts")}</h3>
               <p className="settings-help">{t("shortcutFormatHelp")}</p>
-              <div className="settings-grid">
+              <div className="shortcut-settings-list">
                 {shortcutFields.map(([key, labelKey]) => (
-                  <label key={key}>
-                    {t(labelKey)}
-                    <input
-                      data-testid={`shortcut-${key}`}
-                      aria-label={t(labelKey)}
-                      value={value.shortcuts[key] ?? ""}
-                      onChange={(event) => updateShortcut(key, event.target.value)}
-                    />
-                  </label>
+                  <div className="shortcut-setting-row" key={key}>
+                    <span className="shortcut-setting-label">{t(labelKey)}</span>
+                    <div className="shortcut-setting-inputs">
+                      {shortcutValues(value.shortcuts, key).map((shortcut, index) => (
+                        <input
+                          key={`${key}-${index}`}
+                          data-testid={`shortcut-${key}`}
+                          aria-label={`${t(labelKey)} ${index + 1}`}
+                          value={displayShortcut(shortcut)}
+                          onChange={(event) => {
+                            const next = [...shortcutValues(value.shortcuts, key)];
+                            next[index] = event.target.value;
+                            updateShortcut(key, next);
+                          }}
+                        />
+                      ))}
+                    </div>
+                    <button
+                      type="button"
+                      className="shortcut-setting-button"
+                      data-testid={`shortcut-reset-${key}`}
+                      onClick={() => updateShortcut(key, defaultSettings.shortcuts[key])}
+                    >
+                      {t("resetShortcut")}
+                    </button>
+                    <button
+                      type="button"
+                      className="shortcut-setting-button"
+                      data-testid={`shortcut-add-${key}`}
+                      onClick={() =>
+                        updateShortcut(key, [...shortcutValues(value.shortcuts, key), ""])
+                      }
+                    >
+                      {t("addShortcut")}
+                    </button>
+                  </div>
                 ))}
               </div>
             </section>
