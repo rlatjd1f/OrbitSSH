@@ -778,6 +778,12 @@
   font-size: 13px;
   letter-spacing: 0.3px;
 }
+.settings-help {
+  margin: -4px 0 12px !important;
+  color: #8f97a8 !important;
+  font-size: 12px !important;
+  line-height: 1.5;
+}
 .settings-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

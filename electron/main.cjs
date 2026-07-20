@@ -359,6 +359,17 @@ const defaultSettings = {
   defaultPort: 22,
   defaultAuthType: "key",
   keepAliveInterval: 30,
+  shortcuts: {
+    closeTab: "CommandOrControl+W",
+    interrupt: "Control+C",
+    splitTab: "Command+D",
+    openSession: "Control+N",
+    previousPane: "Control+[",
+    nextPane: "Control+]",
+    duplicateTab: "Control+T",
+    openSettings: "Command+,",
+    nextTab: "Control+Tab",
+  },
 };
 const storePath = () => path.join(app.getPath("userData"), "connections.json");
 const settingsPath = () => path.join(app.getPath("userData"), "settings.json");
@@ -369,6 +380,116 @@ const clamp = (value, min, max, fallback) => {
     : fallback;
 };
 
+function normalizeShortcut(value, fallback) {
+  const raw = String(value ?? "").trim();
+  const source = raw || fallback;
+  const parts = source
+    .split("+")
+    .map((part) => part.trim())
+    .filter(Boolean);
+  if (!parts.length) return fallback;
+  const key = parts.pop();
+  const modifiers = [];
+  const seen = new Set();
+  for (const part of parts) {
+    const lower = part.toLowerCase().replace(/[\s_-]/g, "");
+    const normalized =
+      lower === "cmd" || lower === "command" || lower === "meta"
+        ? "Command"
+        : lower === "ctrl" || lower === "control"
+          ? "Control"
+          : lower === "cmdorctrl" ||
+              lower === "commandorcontrol" ||
+              lower === "commandorctrl"
+            ? "CommandOrControl"
+            : lower === "shift"
+              ? "Shift"
+              : lower === "alt" || lower === "option"
+                ? "Alt"
+                : "";
+    if (!normalized || seen.has(normalized)) continue;
+    seen.add(normalized);
+    modifiers.push(normalized);
+  }
+  const keyMap = {
+    escape: "Escape",
+    esc: "Escape",
+    tab: "Tab",
+    comma: ",",
+    bracketleft: "[",
+    bracketright: "]",
+    space: "Space",
+  };
+  const normalizedKey =
+    keyMap[String(key).toLowerCase().replace(/[\s_-]/g, "")] ??
+    (String(key).length === 1
+      ? String(key).toUpperCase()
+      : String(key).replace(/\s+/g, ""));
+  if (!normalizedKey) return fallback;
+  return [...modifiers, normalizedKey].join("+");
+}
+
+function normalizeShortcuts(value = {}) {
+  return Object.fromEntries(
+    Object.entries(defaultSettings.shortcuts).map(([key, fallback]) => [
+      key,
+      normalizeShortcut(value?.[key], fallback),
+    ]),
+  );
+}
+
+function electronAccelerator(shortcut) {
+  return normalizeShortcut(shortcut, shortcut).replace(
+    "CommandOrControl",
+    "CmdOrCtrl",
+  );
+}
+
+function shortcutParts(shortcut) {
+  const parts = normalizeShortcut(shortcut, shortcut).split("+");
+  const key = parts.pop() ?? "";
+  const modifiers = new Set(parts);
+  return {
+    key: key.toLowerCase(),
+    command: modifiers.has("Command"),
+    control: modifiers.has("Control"),
+    commandOrControl: modifiers.has("CommandOrControl"),
+    shift: modifiers.has("Shift"),
+    alt: modifiers.has("Alt"),
+  };
+}
+
+function inputKey(input) {
+  const key = String(input.key ?? "").toLowerCase();
+  if (input.code === "BracketLeft") return "[";
+  if (input.code === "BracketRight") return "]";
+  return key;
+}
+
+function matchesShortcut(input, shortcut, context) {
+  const parsed = shortcutParts(shortcut);
+  if (inputKey(input) !== parsed.key) return false;
+  if (Boolean(input.shift) !== parsed.shift) return false;
+  if (Boolean(input.alt) !== parsed.alt) return false;
+  const metaPressed = Boolean(input.meta);
+  const controlUsable =
+    context.controlPressed &&
+    (!metaPressed ||
+      context.physicalControlDown ||
+      context.remappedControlShortcut ||
+      context.remappedControlC);
+  if (parsed.commandOrControl) {
+    if (!metaPressed && !controlUsable) return false;
+  } else {
+    if (parsed.command && !metaPressed) return false;
+    if (parsed.control && !controlUsable) return false;
+    if (!parsed.command && metaPressed && !(parsed.control && controlUsable))
+      return false;
+    if (!parsed.control && controlUsable) return false;
+  }
+  return true;
+}
+
 function loadSettings() {
   try {
     const stored = JSON.parse(fs.readFileSync(settingsPath(), "utf8"));
@@ -376,9 +497,10 @@ function loadSettings() {
       ...defaultSettings,
       ...stored,
       language: stored.language === "en" ? "en" : "ko",
+      shortcuts: normalizeShortcuts(stored.shortcuts),
     };
   } catch {
-    return { ...defaultSettings };
+    return { ...defaultSettings, shortcuts: normalizeShortcuts() };
   }
 }
 
@@ -400,6 +522,7 @@ function saveSettings(value) {
     defaultPort: clamp(value.defaultPort, 1, 65535, 22),
     defaultAuthType: value.defaultAuthType === "password" ? "password" : "key",
     keepAliveInterval: clamp(value.keepAliveInterval, 0, 600, 30),
+    shortcuts: normalizeShortcuts(value.shortcuts),
   };
   fs.mkdirSync(path.dirname(settingsPath()), { recursive: true });
   fs.writeFileSync(settingsPath(), JSON.stringify(clean, null, 2), {
@@ -780,20 +903,22 @@ function closeTerminal(sessionId) {
 }
 
 function registerTerminalShortcut() {
-  globalShortcut.unregister("Control+C");
-  const registered = globalShortcut.register("Control+C", () => {
+  const accelerator = electronAccelerator(loadSettings().shortcuts.interrupt);
+  globalShortcut.unregisterAll();
+  const registered = globalShortcut.register(accelerator, () => {
     logShortcut("global-shortcut:invoked", {
       focused: Boolean(mainWindow?.isFocused()),
       modalOpen,
+      accelerator,
     });
     if (modalOpen) return;
     interruptActiveTerminal();
   });
-  logShortcut("global-shortcut:registered", { registered });
+  logShortcut("global-shortcut:registered", { registered, accelerator });
 }
 
 function unregisterTerminalShortcut() {
-  globalShortcut.unregister("Control+C");
+  globalShortcut.unregisterAll();
   logShortcut("global-shortcut:unregistered");
 }
 
@@ -918,6 +1043,7 @@ function registerIpc() {
   ipcMain.handle("settings:save", (_event, value) => {
     const saved = saveSettings(value);
     installApplicationMenu(saved.language);
+    if (mainWindow?.isFocused()) registerTerminalShortcut();
     return saved;
   });
   ipcMain.handle("terminal:start", (_event, host) => startSession(host));
@@ -1035,61 +1161,68 @@ function createWindow() {
         remappedControlCActive = false;
       return;
     }
-    if (key === "w" && (input.meta || input.control)) {
+    const shortcuts = loadSettings().shortcuts;
+    const shortcutContext = {
+      controlPressed,
+      physicalControlDown,
+      remappedControlShortcut,
+      remappedControlC,
+    };
+    if (
+      input.type === "keyDown" &&
+      matchesShortcut(input, shortcuts.closeTab, shortcutContext)
+    ) {
       event.preventDefault();
       mainWindow.webContents.send("shortcut:action", "close-tab");
-    } else if (
-      key === "c" &&
-      controlPressed &&
-      (!input.meta || physicalControlDown || remappedControlC)
-    ) {
+    } else if (matchesShortcut(input, shortcuts.interrupt, shortcutContext)) {
       if (activeTerminalSessionId) {
         event.preventDefault();
         if (input.type === "keyDown") interruptActiveTerminal();
       }
-    } else if (key === "d" && input.meta) {
+    } else if (
+      input.type === "keyDown" &&
+      matchesShortcut(input, shortcuts.splitTab, shortcutContext)
+    ) {
       event.preventDefault();
       mainWindow.webContents.send("shortcut:action", "split-tab");
     } else if (
       input.type === "keyDown" &&
-      key === "n" &&
-      controlPressed &&
-      (!input.meta || remappedControlShortcut)
+      matchesShortcut(input, shortcuts.openSession, shortcutContext)
     ) {
       event.preventDefault();
       logShortcut("shortcut:dispatch", { action: "open-session" });
       mainWindow.webContents.send("shortcut:action", "open-session");
     } else if (
       input.type === "keyDown" &&
-      controlPressed &&
-      (!input.meta || remappedControlShortcut) &&
-      (key === "[" || input.code === "BracketLeft")
+      matchesShortcut(input, shortcuts.previousPane, shortcutContext)
     ) {
       event.preventDefault();
       logShortcut("shortcut:dispatch", { action: "previous-pane" });
       mainWindow.webContents.send("shortcut:action", "previous-pane");
     } else if (
       input.type === "keyDown" &&
-      controlPressed &&
-      (!input.meta || remappedControlShortcut) &&
-      (key === "]" || input.code === "BracketRight")
+      matchesShortcut(input, shortcuts.nextPane, shortcutContext)
     ) {
       event.preventDefault();
       logShortcut("shortcut:dispatch", { action: "next-pane" });
       mainWindow.webContents.send("shortcut:action", "next-pane");
     } else if (
       input.type === "keyDown" &&
-      key === "t" &&
-      controlPressed &&
-      (!input.meta || remappedControlShortcut)
+      matchesShortcut(input, shortcuts.duplicateTab, shortcutContext)
     ) {
       event.preventDefault();
       logShortcut("shortcut:dispatch", { action: "duplicate-tab" });
       mainWindow.webContents.send("shortcut:action", "duplicate-tab");
-    } else if (key === "," && (input.meta || input.control)) {
+    } else if (
+      input.type === "keyDown" &&
+      matchesShortcut(input, shortcuts.openSettings, shortcutContext)
+    ) {
       event.preventDefault();
       mainWindow.webContents.send("shortcut:action", "open-settings");
-    } else if (key === "tab" && input.control && !input.shift) {
+    } else if (
+      input.type === "keyDown" &&
+      matchesShortcut(input, shortcuts.nextTab, shortcutContext)
+    ) {
       event.preventDefault();
       mainWindow.webContents.send("shortcut:action", "next-tab");
     }
@@ -1113,6 +1246,7 @@ function createWindow() {
 
 function installApplicationMenu(language = loadSettings().language) {
   const ko = language !== "en";
+  const shortcuts = loadSettings().shortcuts;
   const menuText = ko
     ? {
         about: `${appMenuName} 정보`,
@@ -1171,7 +1305,7 @@ function installApplicationMenu(language = loadSettings().language) {
               { role: "about", label: menuText.about },
               {
                 label: menuText.settings,
-                accelerator: "Command+,",
+                accelerator: electronAccelerator(shortcuts.openSettings),
                 click: () => send("shortcut:action", "open-settings"),
               },
               {
@@ -1206,7 +1340,7 @@ function installApplicationMenu(language = loadSettings().language) {
       submenu: [
         {
           label: menuText.interrupt,
-          sublabel: "Control+C",
+          sublabel: shortcuts.interrupt,
           click: () => {
             logShortcut("menu:interrupt-clicked");
             interruptActiveTerminal();
@@ -1350,10 +1484,11 @@ app.whenReady().then(() => {
           const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
           const navGeneral=document.querySelector('[data-testid="settings-nav-general"]');
           const navTerminal=document.querySelector('[data-testid="settings-nav-terminal"]');
+          const navShortcuts=document.querySelector('[data-testid="settings-nav-shortcuts"]');
           const navDefaults=document.querySelector('[data-testid="settings-nav-defaults"]');
           const navUpdates=document.querySelector('[data-testid="settings-nav-updates"]');
           const language=document.querySelector('[data-testid="language-select"]');
-          const settingsSidebarVisible=Boolean(navGeneral&&navTerminal&&navDefaults&&navUpdates&&document.querySelector('.settings-layout'));
+          const settingsSidebarVisible=Boolean(navGeneral&&navTerminal&&navShortcuts&&navDefaults&&navUpdates&&document.querySelector('.settings-layout'));
           const setValue=async(el,value)=>{const setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;setter.call(el,value);el.dispatchEvent(new Event('input',{bubbles:true}));await wait(30)};
           const setSelect=async(el,value)=>{const setter=Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value').set;setter.call(el,value);el.dispatchEvent(new Event('change',{bubbles:true}));await wait(30)};
           const settingsOpened=Boolean(settingsSidebarVisible&&language);
@@ -1368,6 +1503,9 @@ app.whenReady().then(() => {
           const sectionFontSize=parseFloat(getComputedStyle(document.querySelector('.settings-section h3')).fontSize);
           if(font) await setSelect(font,'Menlo, Monaco, monospace');
           if(scrollback) await setValue(scrollback,'7000');
+          document.querySelector('[data-testid="settings-nav-shortcuts"]')?.click(); await wait(40);
+          const splitShortcut=document.querySelector('[data-testid="shortcut-splitTab"]');
+          const defaultSplitShortcut=splitShortcut?.value==='Command+D';
           document.querySelector('[data-testid="settings-nav-defaults"]')?.click(); await wait(40);
           const input=document.querySelector('[data-testid="default-user"]');
           if(input) await setValue(input,'global-test-user');
@@ -1382,7 +1520,7 @@ app.whenReady().then(() => {
           document.querySelector('[data-testid="new-connection"]').click();await wait(30);
           const englishConnectionUi=document.querySelector('.modal h2')?.textContent==='New SSH connection'&&document.querySelector('[data-testid="device-name"]')?.getAttribute('aria-label')==='Device name'&&document.querySelector('.auth-options legend')?.textContent==='Authentication method';
           window.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape'}));await wait(30);
-          return {settingsOpened,settingsSidebarVisible,englishPreview,englishAppUi,englishConnectionUi,defaultLocalSessionOpened,appVersionVisible:appVersion?.textContent.includes('v${app.getVersion()}'),updateAvailableVisible:Boolean(updateResult),fontOptionCount:font?.options.length,defaultScrollback,fontColor,labelFontSize,sectionFontSize,settingsClosed:!document.querySelector('.settings-modal')};
+          return {settingsOpened,settingsSidebarVisible,englishPreview,englishAppUi,englishConnectionUi,defaultLocalSessionOpened,appVersionVisible:appVersion?.textContent.includes('v${app.getVersion()}'),updateAvailableVisible:Boolean(updateResult),fontOptionCount:font?.options.length,defaultScrollback,defaultSplitShortcut,fontColor,labelFontSize,sectionFontSize,settingsClosed:!document.querySelector('.settings-modal')};
         })()`);
         const englishMenuLabels = Menu.getApplicationMenu()?.items.flatMap(
           (item) => [
@@ -1622,6 +1760,7 @@ app.whenReady().then(() => {
           persistedSettings.terminalFontFamily === "Menlo, Monaco, monospace" &&
           persistedSettings.scrollback === 7000;
         result.defaultScrollback = settingsCheck.defaultScrollback;
+        result.defaultSplitShortcut = settingsCheck.defaultSplitShortcut;
         result.fontComboHasTenOptions = settingsCheck.fontOptionCount === 10;
         result.settingsSelectReadable =
           settingsCheck.fontColor !== "rgb(0, 0, 0)";
@@ -2117,6 +2256,7 @@ app.whenReady().then(() => {
           result.settingsEscapeClosed &&
           result.settingsPersisted &&
           result.defaultScrollback &&
+          result.defaultSplitShortcut &&
           result.fontComboHasTenOptions &&
           result.settingsSelectReadable &&
           result.settingsLabelsLarger &&

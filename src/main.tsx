@@ -60,6 +60,17 @@ const defaultSettings: AppSettings = {
   defaultPort: 22,
   defaultAuthType: "key",
   keepAliveInterval: 30,
+  shortcuts: {
+    closeTab: "CommandOrControl+W",
+    interrupt: "Control+C",
+    splitTab: "Command+D",
+    openSession: "Control+N",
+    previousPane: "Control+[",
+    nextPane: "Control+]",
+    duplicateTab: "Control+T",
+    openSettings: "Command+,",
+    nextTab: "Control+Tab",
+  },
 };
 const colors = ["#ff7a59", "#49c6a1", "#5ea0ff", "#ae8cff"];
 let activeTerminalInstance: Terminal | null = null;
@@ -74,6 +85,17 @@ const terminalFonts = [
   ["IBM Plex Mono", "IBM Plex Mono, monospace"],
   ["Cascadia Code", "Cascadia Code, monospace"],
   ["system", "ui-monospace, SFMono-Regular, monospace"],
+] as const;
+const shortcutFields = [
+  ["closeTab", "closeTabShortcut"],
+  ["interrupt", "interruptShortcut"],
+  ["splitTab", "splitTabShortcut"],
+  ["openSession", "openSessionShortcut"],
+  ["previousPane", "previousPaneShortcut"],
+  ["nextPane", "nextPaneShortcut"],
+  ["duplicateTab", "duplicateTabShortcut"],
+  ["openSettings", "openSettingsShortcut"],
+  ["nextTab", "nextTabShortcut"],
 ] as const;
 
 function TerminalPane({
@@ -288,12 +310,20 @@ function SettingsForm({
 }) {
   const language = value.language;
   const [activeSection, setActiveSection] = useState<
-    "general" | "terminal" | "defaults" | "ssh" | "updates"
+    "general" | "terminal" | "shortcuts" | "defaults" | "ssh" | "updates"
   >("general");
   const t = (key: MessageKey, values?: Record<string, string | number>) =>
     translate(language, key, values);
   const update = <K extends keyof AppSettings>(key: K, next: AppSettings[K]) =>
     onChange({ ...value, [key]: next });
+  const updateShortcut = (
+    key: keyof AppSettings["shortcuts"],
+    next: string,
+  ) =>
+    onChange({
+      ...value,
+      shortcuts: { ...value.shortcuts, [key]: next },
+    });
   const isDownloading = updateStatus.phase === "downloading";
   const isInstalling = updateStatus.phase === "installing";
   const isUpdateBusy = isDownloading || isInstalling;
@@ -305,6 +335,7 @@ function SettingsForm({
   const sectionButtons = [
     { id: "general", label: t("general"), icon: Settings },
     { id: "terminal", label: t("terminal"), icon: TerminalSquare },
+    { id: "shortcuts", label: t("shortcuts"), icon: Command },
     { id: "defaults", label: t("connectionDefaults"), icon: Server },
     { id: "ssh", label: t("sshConnection"), icon: LockKeyhole },
     { id: "updates", label: t("appUpdate"), icon: Download },
@@ -433,6 +464,25 @@ function SettingsForm({
                     onChange={(e) => update("cursorBlink", e.target.checked)}
                   />
                 </label>
+              </div>
+            </section>
+          )}
+          {activeSection === "shortcuts" && (
+            <section className="settings-section">
+              <h3>{t("shortcuts")}</h3>
+              <p className="settings-help">{t("shortcutFormatHelp")}</p>
+              <div className="settings-grid">
+                {shortcutFields.map(([key, labelKey]) => (
+                  <label key={key}>
+                    {t(labelKey)}
+                    <input
+                      data-testid={`shortcut-${key}`}
+                      aria-label={t(labelKey)}
+                      value={value.shortcuts[key] ?? ""}
+                      onChange={(event) => updateShortcut(key, event.target.value)}
+                    />
+                  </label>
+                ))}
               </div>
             </section>
           )}

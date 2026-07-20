@@ -25,6 +25,18 @@ type AppSettings = {
   defaultPort: number;
   defaultAuthType: "password" | "key";
   keepAliveInterval: number;
+  shortcuts: Record<
+    | "closeTab"
+    | "interrupt"
+    | "splitTab"
+    | "openSession"
+    | "previousPane"
+    | "nextPane"
+    | "duplicateTab"
+    | "openSettings"
+    | "nextTab",
+    string
+  >;
 };
 type UpdateInfo = {
   currentVersion: string;
