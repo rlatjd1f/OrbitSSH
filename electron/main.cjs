@@ -359,6 +359,10 @@ const defaultSettings = {
   defaultPort: 22,
   defaultAuthType: "key",
   keepAliveInterval: 30,
+  settingsModalSize: {
+    width: 860,
+    height: 640,
+  },
   shortcuts: {
     closeTab: ["CommandOrControl+W"],
     interrupt: ["Control+C"],
@@ -455,6 +459,13 @@ function normalizeShortcuts(value = {}) {
   );
 }
 
+function normalizeSettingsModalSize(value = {}) {
+  return {
+    width: clamp(value.width, 860, 1600, defaultSettings.settingsModalSize.width),
+    height: clamp(value.height, 640, 1200, defaultSettings.settingsModalSize.height),
+  };
+}
+
 function electronAccelerator(shortcut) {
   const first = Array.isArray(shortcut) ? shortcut[0] : shortcut;
   return normalizeShortcut(first, first).replace(
@@ -530,10 +541,15 @@ function loadSettings() {
       ...defaultSettings,
       ...stored,
       language: stored.language === "en" ? "en" : "ko",
+      settingsModalSize: normalizeSettingsModalSize(stored.settingsModalSize),
       shortcuts: normalizeShortcuts(stored.shortcuts),
     };
   } catch {
-    return { ...defaultSettings, shortcuts: normalizeShortcuts() };
+    return {
+      ...defaultSettings,
+      settingsModalSize: normalizeSettingsModalSize(),
+      shortcuts: normalizeShortcuts(),
+    };
   }
 }
 
@@ -555,6 +571,7 @@ function saveSettings(value) {
     defaultPort: clamp(value.defaultPort, 1, 65535, 22),
     defaultAuthType: value.defaultAuthType === "password" ? "password" : "key",
     keepAliveInterval: clamp(value.keepAliveInterval, 0, 600, 30),
+    settingsModalSize: normalizeSettingsModalSize(value.settingsModalSize),
     shortcuts: normalizeShortcuts(value.shortcuts),
   };
   fs.mkdirSync(path.dirname(settingsPath()), { recursive: true });
@@ -562,6 +579,14 @@ function saveSettings(value) {
     mode: 0o600,
   });
   return clean;
+}
+
+function saveSettingsModalSize(value) {
+  const current = loadSettings();
+  return saveSettings({
+    ...current,
+    settingsModalSize: normalizeSettingsModalSize(value),
+  }).settingsModalSize;
 }
 
 function loadStore() {
@@ -1084,6 +1109,9 @@ function registerIpc() {
     if (mainWindow?.isFocused()) registerTerminalShortcut();
     return saved;
   });
+  ipcMain.handle("settings:save-modal-size", (_event, value) =>
+    saveSettingsModalSize(value),
+  );
   ipcMain.handle("terminal:start", (_event, host) => startSession(host));
   ipcMain.handle("terminal:start-local", () => startLocalSession());
   ipcMain.handle("input-source:english", () => switchToEnglishInputSource());
@@ -1594,7 +1622,7 @@ app.whenReady().then(() => {
           document.querySelector('[data-testid="new-connection"]').click();await wait(30);
           const englishConnectionUi=document.querySelector('.modal h2')?.textContent==='New SSH connection'&&document.querySelector('[data-testid="device-name"]')?.getAttribute('aria-label')==='Device name'&&document.querySelector('.auth-options legend')?.textContent==='Authentication method';
           window.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape'}));await wait(30);
-          return {settingsOpened,settingsSidebarVisible,settingsFixedSize,settingsContentScrollable,settingsModalResizable,settingsMinSizeLocked,settingsResizeAnchored,englishPreview,englishAppUi,englishConnectionUi,defaultLocalSessionOpened,appVersionVisible:appVersion?.textContent.includes('v${app.getVersion()}'),updateAvailableVisible:Boolean(updateResult),fontOptionCount:font?.options.length,defaultScrollback,defaultSplitShortcut,shortcutAdded,shortcutCaptured,shortcutReset,shortcutConflictWarning,shortcutConflictBlocked,shortcutRecaptured,fontColor,labelFontSize,sectionFontSize,settingsClosed:!document.querySelector('.settings-modal')};
+          return {settingsOpened,settingsSidebarVisible,settingsFixedSize,settingsContentScrollable,settingsModalResizable,settingsMinSizeLocked,settingsResizeAnchored,rememberedModalWidth:Math.round(modalSizeBefore?.width??0),rememberedModalHeight:Math.round(modalSizeBefore?.height??0),englishPreview,englishAppUi,englishConnectionUi,defaultLocalSessionOpened,appVersionVisible:appVersion?.textContent.includes('v${app.getVersion()}'),updateAvailableVisible:Boolean(updateResult),fontOptionCount:font?.options.length,defaultScrollback,defaultSplitShortcut,shortcutAdded,shortcutCaptured,shortcutReset,shortcutConflictWarning,shortcutConflictBlocked,shortcutRecaptured,fontColor,labelFontSize,sectionFontSize,settingsClosed:!document.querySelector('.settings-modal')};
         })()`);
         const englishMenuLabels = Menu.getApplicationMenu()?.items.flatMap(
           (item) => [
@@ -1616,11 +1644,13 @@ app.whenReady().then(() => {
         const languageReset = await mainWindow.webContents.executeJavaScript(`(async()=>{
           const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
           const language=document.querySelector('[data-testid="language-select"]');
+          const reopenedSize=document.querySelector('.settings-modal')?.getBoundingClientRect();
+          const settingsModalSizeRestored=Boolean(reopenedSize&&Math.abs(reopenedSize.width-${settingsCheck.rememberedModalWidth})<2&&Math.abs(reopenedSize.height-${settingsCheck.rememberedModalHeight})<2);
           const englishSettingsOpened=document.querySelector('.settings-modal h2')?.textContent==='Settings'&&language?.value==='en';
           const setter=Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value').set;setter.call(language,'ko');language.dispatchEvent(new Event('change',{bubbles:true}));await wait(40);
           const koreanPreview=document.querySelector('.settings-modal h2')?.textContent==='설정';
           document.querySelector('.settings-modal .modal-actions .primary').click();await wait(100);
-          return {englishSettingsOpened,koreanPreview,closed:!document.querySelector('.settings-modal')};
+          return {englishSettingsOpened,settingsModalSizeRestored,reopenedWidth:Math.round(reopenedSize?.width??0),reopenedHeight:Math.round(reopenedSize?.height??0),koreanPreview,closed:!document.querySelector('.settings-modal')};
         })()`);
         const koreanMenuLabels = Menu.getApplicationMenu()?.items.flatMap(
           (item) => [
@@ -1808,8 +1838,11 @@ app.whenReady().then(() => {
           englishMenuLabels?.includes("Copy");
         result.koreanLanguageRestored =
           languageReset.englishSettingsOpened &&
+          languageReset.settingsModalSizeRestored &&
           languageReset.koreanPreview &&
           languageReset.closed;
+        result.settingsModalSizeRestored =
+          languageReset.settingsModalSizeRestored;
         result.koreanMenu =
           koreanMenuLabels?.includes(appMenuName) &&
           koreanMenuLabels?.includes(`${appMenuName} 정보`) &&
@@ -1837,7 +1870,11 @@ app.whenReady().then(() => {
           persistedSettings.defaultUser === "global-test-user" &&
           persistedSettings.language === "ko" &&
           persistedSettings.terminalFontFamily === "Menlo, Monaco, monospace" &&
-          persistedSettings.scrollback === 7000;
+          persistedSettings.scrollback === 7000 &&
+          persistedSettings.settingsModalSize.width ===
+            settingsCheck.rememberedModalWidth &&
+          persistedSettings.settingsModalSize.height ===
+            settingsCheck.rememberedModalHeight;
         result.defaultScrollback = settingsCheck.defaultScrollback;
         result.defaultSplitShortcut = settingsCheck.defaultSplitShortcut;
         result.shortcutAdded = settingsCheck.shortcutAdded;
@@ -2344,6 +2381,7 @@ app.whenReady().then(() => {
           result.settingsModalResizable &&
           result.settingsMinSizeLocked &&
           result.settingsResizeAnchored &&
+          result.settingsModalSizeRestored &&
           result.settingsPersisted &&
           result.defaultScrollback &&
           result.defaultSplitShortcut &&

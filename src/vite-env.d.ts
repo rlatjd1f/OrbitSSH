@@ -25,6 +25,10 @@ type AppSettings = {
   defaultPort: number;
   defaultAuthType: "password" | "key";
   keepAliveInterval: number;
+  settingsModalSize: {
+    width: number;
+    height: number;
+  };
   shortcuts: Record<
     | "closeTab"
     | "interrupt"
@@ -100,6 +104,9 @@ interface Window {
     settings: {
       load(): Promise<AppSettings>;
       save(value: AppSettings): Promise<AppSettings>;
+      saveModalSize(value: AppSettings["settingsModalSize"]): Promise<
+        AppSettings["settingsModalSize"]
+      >;
     };
     inputSource: {
       useEnglish(): Promise<boolean>;

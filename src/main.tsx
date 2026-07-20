@@ -60,6 +60,10 @@ const defaultSettings: AppSettings = {
   defaultPort: 22,
   defaultAuthType: "key",
   keepAliveInterval: 30,
+  settingsModalSize: {
+    width: 860,
+    height: 640,
+  },
   shortcuts: {
     closeTab: ["CommandOrControl+W"],
     interrupt: ["Control+C"],
@@ -990,6 +994,9 @@ function App() {
   });
   const [updateError, setUpdateError] = useState("");
   const [updateDismissed, setUpdateDismissed] = useState(false);
+  const settingsModalRef = useRef<HTMLDivElement | null>(null);
+  const settingsModalResizeTimer = useRef<number | null>(null);
+  const settingsRef = useRef(settings);
   const [form, setForm] = useState({
     name: "",
     host: "0.0.0.0",
@@ -1003,6 +1010,72 @@ function App() {
   const language = settings.language;
   const t = (key: MessageKey, values?: Record<string, string | number>) =>
     translate(language, key, values);
+  useEffect(() => {
+    settingsRef.current = settings;
+  }, [settings]);
+  const applySettingsModalSize = (size: AppSettings["settingsModalSize"]) => {
+    settingsRef.current = { ...settingsRef.current, settingsModalSize: size };
+    setSettings((current) => ({ ...current, settingsModalSize: size }));
+    setSettingsDraft((draft) => ({ ...draft, settingsModalSize: size }));
+  };
+  const persistSettingsModalSize = (size: AppSettings["settingsModalSize"]) => {
+    applySettingsModalSize(size);
+    void window.desktop?.settings.saveModalSize(size).then((savedSize) => {
+      applySettingsModalSize(savedSize);
+    });
+  };
+  const captureSettingsModalSize = () => {
+    if (dialog !== "settings" || !settingsModalRef.current) return null;
+    const rect = settingsModalRef.current.getBoundingClientRect();
+    const width = Math.round(rect.width);
+    const height = Math.round(rect.height);
+    if (width <= 0 || height <= 0) return null;
+    const size = { width, height };
+    persistSettingsModalSize(size);
+    return size;
+  };
+  const closeDialog = () => {
+    captureSettingsModalSize();
+    setDialog(null);
+  };
+  useEffect(() => {
+    if (dialog !== "settings" || !settingsModalRef.current) return;
+    const modal = settingsModalRef.current;
+    let lastWidth = Math.round(modal.getBoundingClientRect().width);
+    let lastHeight = Math.round(modal.getBoundingClientRect().height);
+    const persistIfChanged = (width: number, height: number) => {
+      if (
+        Math.abs(width - lastWidth) < 2 &&
+        Math.abs(height - lastHeight) < 2
+      )
+        return;
+      lastWidth = width;
+      lastHeight = height;
+      if (settingsModalResizeTimer.current)
+        window.clearTimeout(settingsModalResizeTimer.current);
+      settingsModalResizeTimer.current = window.setTimeout(() => {
+        applySettingsModalSize({ width, height });
+      }, 250);
+    };
+    const observer = new ResizeObserver(() => {
+      const rect = modal.getBoundingClientRect();
+      const width = Math.round(rect.width);
+      const height = Math.round(rect.height);
+      persistIfChanged(width, height);
+    });
+    observer.observe(modal);
+    return () => {
+      observer.disconnect();
+      const rect = modal.getBoundingClientRect();
+      const width = Math.round(rect.width);
+      const height = Math.round(rect.height);
+      if (settingsModalResizeTimer.current) {
+        window.clearTimeout(settingsModalResizeTimer.current);
+        settingsModalResizeTimer.current = null;
+      }
+      if (width > 0 && height > 0) persistSettingsModalSize({ width, height });
+    };
+  }, [dialog]);
   const stateLabel = (state: SessionState) =>
     t(
       ({
@@ -1318,7 +1391,12 @@ function App() {
   };
   const submitSettings = async (e: FormEvent) => {
     e.preventDefault();
-    const saved = await window.desktop!.settings.save(settingsDraft);
+    const settingsModalSize = captureSettingsModalSize();
+    const saved = await window.desktop!.settings.save(
+      settingsModalSize
+        ? { ...settingsDraft, settingsModalSize }
+        : settingsDraft,
+    );
     setSettings(saved);
     setSettingsDraft(saved);
     setDialog(null);
@@ -2149,18 +2227,27 @@ function App() {
         <div
           className="modal-backdrop"
           onMouseDown={(e) => {
-            if (e.target === e.currentTarget) setDialog(null);
+            if (e.target === e.currentTarget) closeDialog();
           }}
         >
           <div
+            ref={dialog === "settings" ? settingsModalRef : undefined}
             className={`modal ${dialog === "settings" ? "settings-modal" : ""} ${
               dialog === "update-check" ? "update-check-modal" : ""
             }`}
+            style={
+              dialog === "settings"
+                ? {
+                    width: settingsDraft.settingsModalSize.width,
+                    height: settingsDraft.settingsModalSize.height,
+                  }
+                : undefined
+            }
           >
             <button
               className="modal-close"
               aria-label={t("close")}
-              onClick={() => setDialog(null)}
+              onClick={closeDialog}
             >
               <X />
             </button>
@@ -2174,7 +2261,7 @@ function App() {
                 updateError={updateError}
                 onChange={setSettingsDraft}
                 onSubmit={submitSettings}
-                onCancel={() => setDialog(null)}
+                onCancel={closeDialog}
                 onCheckUpdates={() => void checkUpdates()}
                 onDownloadUpdate={() => void downloadUpdate()}
                 onOpenRelease={() => void window.desktop?.updates.openRelease()}
@@ -2352,7 +2439,7 @@ function App() {
                   <p className="session-picker-empty">{t("noServersToOpen")}</p>
                 )}
                 <div className="modal-actions">
-                  <button type="button" onClick={() => setDialog(null)}>
+                  <button type="button" onClick={closeDialog}>
                     {t("cancel")}
                   </button>
                   <button
@@ -2386,7 +2473,7 @@ function App() {
                   />
                 </label>
                 <div className="modal-actions">
-                  <button type="button" onClick={() => setDialog(null)}>
+                  <button type="button" onClick={closeDialog}>
                     {t("cancel")}
                   </button>
                   <button className="primary">{t("create")}</button>
@@ -2530,7 +2617,7 @@ function App() {
                   </label>
                 )}
                 <div className="modal-actions">
-                  <button type="button" onClick={() => setDialog(null)}>
+                  <button type="button" onClick={closeDialog}>
                     {t("cancel")}
                   </button>
                   <button className="primary">

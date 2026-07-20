@@ -26,6 +26,8 @@ contextBridge.exposeInMainWorld("desktop", {
   settings: {
     load: () => ipcRenderer.invoke("settings:load"),
     save: (value) => ipcRenderer.invoke("settings:save", value),
+    saveModalSize: (value) =>
+      ipcRenderer.invoke("settings:save-modal-size", value),
   },
   inputSource: {
     useEnglish: () => ipcRenderer.invoke("input-source:english"),
