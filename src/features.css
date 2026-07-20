@@ -272,10 +272,18 @@
   padding: 0;
   overflow: hidden;
 }
-.xterm-host {
+.xterm-shell {
   width: 100%;
   height: 100%;
   padding: 18px 20px;
+  min-height: 0;
+  overflow: hidden;
+}
+.xterm-host {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
 }
 .xterm {
   height: 100%;
@@ -679,11 +687,17 @@
 .pane-bar button svg {
   width: 11px;
 }
-.terminal-pane .xterm-host {
+.terminal-pane .xterm-shell {
   height: auto;
   min-height: 0;
   flex: 1;
   padding: 11px 12px;
+  overflow: hidden;
+}
+.terminal-pane .xterm-host {
+  height: 100%;
+  min-height: 0;
+  padding: 0;
   overflow: hidden;
 }
 .workspace {

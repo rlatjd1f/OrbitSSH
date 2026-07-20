@@ -249,6 +249,7 @@ function TerminalPane({
       cancelAnimationFrame(resizeFrame);
       resizeFrame = requestAnimationFrame(() => {
         fit.fit();
+        term.scrollToBottom();
         if (
           sessionRef.current.sessionId &&
           (term.cols !== lastCols || term.rows !== lastRows)
@@ -279,7 +280,8 @@ function TerminalPane({
         window.desktop?.terminal.write(current.sessionId, data);
     });
     const dataOff = window.desktop.terminal.onData((v) => {
-      if (v.sessionId === sessionRef.current.sessionId) term.write(v.data);
+      if (v.sessionId === sessionRef.current.sessionId)
+        term.write(v.data, () => term.scrollToBottom());
     });
     const exitOff = window.desktop.terminal.onExit((v) => {
       if (v.sessionId === sessionRef.current.sessionId) {
@@ -337,7 +339,11 @@ function TerminalPane({
     term.focus();
     window.desktop?.terminal.resize(session.sessionId, term.cols, term.rows);
   }, [session.sessionId]);
-  return <div className="xterm-host" ref={ref} />;
+  return (
+    <div className="xterm-shell">
+      <div className="xterm-host" ref={ref} />
+    </div>
+  );
 }
 
 function SettingsForm({

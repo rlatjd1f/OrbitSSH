@@ -1980,6 +1980,18 @@ app.whenReady().then(() => {
         result.footerReadable = await mainWindow.webContents.executeJavaScript(
           `(()=>{const footer=document.querySelector('.workspace footer');if(!footer)return false;const style=getComputedStyle(footer);return parseFloat(style.fontSize)>=10&&style.color!=='rgb(97, 104, 119)'&&style.backgroundColor!=='rgb(18, 21, 27)'})()`,
         );
+        result.terminalViewportStable =
+          await mainWindow.webContents.executeJavaScript(`(()=>{
+            const shell=document.querySelector('.terminal-pane:not(.cached) .xterm-shell');
+            const host=document.querySelector('.terminal-pane:not(.cached) .xterm-host');
+            const viewport=document.querySelector('.terminal-pane:not(.cached) .xterm-viewport');
+            if(!shell||!host||!viewport)return false;
+            const style=getComputedStyle(shell);
+            const verticalPadding=parseFloat(style.paddingTop)+parseFloat(style.paddingBottom);
+            const hostUsesInnerHeight=Math.abs(host.getBoundingClientRect().height-(shell.getBoundingClientRect().height-verticalPadding))<2;
+            const viewportAtBottom=viewport.scrollTop+viewport.clientHeight>=viewport.scrollHeight-2;
+            return hostUsesInnerHeight&&viewportAtBottom;
+          })()`);
         sessions.set("resize-fail-test", {
           resize() {
             const error = new Error("ioctl(2) failed, EBADF");
@@ -2461,6 +2473,7 @@ app.whenReady().then(() => {
           result.settingsLabelsLarger &&
           result.labelsMeetMinimumFontSize.passed &&
           result.footerReadable &&
+          result.terminalViewportStable &&
           result.resizeFailureHandled &&
           result.darkThemeContrastReadable.passed &&
           result.enterReconnectsSamePane &&
