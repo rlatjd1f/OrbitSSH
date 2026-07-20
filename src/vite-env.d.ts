@@ -29,6 +29,10 @@ type AppSettings = {
     width: number;
     height: number;
   };
+  settingsModalPosition: {
+    left: number;
+    top: number;
+  };
   shortcuts: Record<
     | "closeTab"
     | "interrupt"
@@ -104,9 +108,13 @@ interface Window {
     settings: {
       load(): Promise<AppSettings>;
       save(value: AppSettings): Promise<AppSettings>;
-      saveModalSize(value: AppSettings["settingsModalSize"]): Promise<
-        AppSettings["settingsModalSize"]
-      >;
+      saveModalPlacement(value: {
+        size?: AppSettings["settingsModalSize"];
+        position?: AppSettings["settingsModalPosition"];
+      }): Promise<{
+        size: AppSettings["settingsModalSize"];
+        position: AppSettings["settingsModalPosition"];
+      }>;
     };
     inputSource: {
       useEnglish(): Promise<boolean>;

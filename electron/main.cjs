@@ -363,6 +363,10 @@ const defaultSettings = {
     width: 860,
     height: 640,
   },
+  settingsModalPosition: {
+    left: -1,
+    top: -1,
+  },
   shortcuts: {
     closeTab: ["CommandOrControl+W"],
     interrupt: ["Control+C"],
@@ -466,6 +470,23 @@ function normalizeSettingsModalSize(value = {}) {
   };
 }
 
+function normalizeSettingsModalPosition(value = {}) {
+  return {
+    left: clamp(
+      value.left,
+      -1,
+      4000,
+      defaultSettings.settingsModalPosition.left,
+    ),
+    top: clamp(
+      value.top,
+      -1,
+      4000,
+      defaultSettings.settingsModalPosition.top,
+    ),
+  };
+}
+
 function electronAccelerator(shortcut) {
   const first = Array.isArray(shortcut) ? shortcut[0] : shortcut;
   return normalizeShortcut(first, first).replace(
@@ -542,12 +563,16 @@ function loadSettings() {
       ...stored,
       language: stored.language === "en" ? "en" : "ko",
       settingsModalSize: normalizeSettingsModalSize(stored.settingsModalSize),
+      settingsModalPosition: normalizeSettingsModalPosition(
+        stored.settingsModalPosition,
+      ),
       shortcuts: normalizeShortcuts(stored.shortcuts),
     };
   } catch {
     return {
       ...defaultSettings,
       settingsModalSize: normalizeSettingsModalSize(),
+      settingsModalPosition: normalizeSettingsModalPosition(),
       shortcuts: normalizeShortcuts(),
     };
   }
@@ -572,6 +597,9 @@ function saveSettings(value) {
     defaultAuthType: value.defaultAuthType === "password" ? "password" : "key",
     keepAliveInterval: clamp(value.keepAliveInterval, 0, 600, 30),
     settingsModalSize: normalizeSettingsModalSize(value.settingsModalSize),
+    settingsModalPosition: normalizeSettingsModalPosition(
+      value.settingsModalPosition,
+    ),
     shortcuts: normalizeShortcuts(value.shortcuts),
   };
   fs.mkdirSync(path.dirname(settingsPath()), { recursive: true });
@@ -581,12 +609,21 @@ function saveSettings(value) {
   return clean;
 }
 
-function saveSettingsModalSize(value) {
+function saveSettingsModalPlacement(value = {}) {
   const current = loadSettings();
-  return saveSettings({
+  const saved = saveSettings({
     ...current,
-    settingsModalSize: normalizeSettingsModalSize(value),
-  }).settingsModalSize;
+    settingsModalSize: normalizeSettingsModalSize(
+      value.size ?? current.settingsModalSize,
+    ),
+    settingsModalPosition: normalizeSettingsModalPosition(
+      value.position ?? current.settingsModalPosition,
+    ),
+  });
+  return {
+    size: saved.settingsModalSize,
+    position: saved.settingsModalPosition,
+  };
 }
 
 function loadStore() {
@@ -1109,8 +1146,8 @@ function registerIpc() {
     if (mainWindow?.isFocused()) registerTerminalShortcut();
     return saved;
   });
-  ipcMain.handle("settings:save-modal-size", (_event, value) =>
-    saveSettingsModalSize(value),
+  ipcMain.handle("settings:save-modal-placement", (_event, value) =>
+    saveSettingsModalPlacement(value),
   );
   ipcMain.handle("terminal:start", (_event, host) => startSession(host));
   ipcMain.handle("terminal:start-local", () => startLocalSession());
@@ -1562,6 +1599,9 @@ app.whenReady().then(() => {
           const initialModalSize=settingsModal?.getBoundingClientRect();
           const modalStyle=getComputedStyle(settingsModal);
           const settingsModalResizable=modalStyle.resize==='both'&&modalStyle.overflow==='hidden';
+          document.querySelector('.modal-backdrop')?.dispatchEvent(new MouseEvent('mousedown',{bubbles:true}));
+          await wait(30);
+          const settingsOutsideClickKeptOpen=Boolean(document.querySelector('.settings-modal'));
           if(settingsModal){settingsModal.style.width='200px';settingsModal.style.height='200px';}
           await wait(30);
           const modalSizeAfterShrinkAttempt=settingsModal?.getBoundingClientRect();
@@ -1570,8 +1610,17 @@ app.whenReady().then(() => {
           await wait(30);
           const modalSizeAfterGrow=settingsModal?.getBoundingClientRect();
           const settingsResizeAnchored=Boolean(initialModalSize&&modalSizeAfterGrow&&Math.abs(initialModalSize.left-modalSizeAfterGrow.left)<1&&Math.abs(initialModalSize.top-modalSizeAfterGrow.top)<1&&modalSizeAfterGrow.width>initialModalSize.width&&modalSizeAfterGrow.height>initialModalSize.height);
+          const dragStart=settingsModal?.getBoundingClientRect();
+          const dragHeader=document.querySelector('.settings-drag-handle');
+          dragHeader?.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,button:0,pointerId:7,clientX:(dragStart?.left??0)+80,clientY:(dragStart?.top??0)+20}));
+          settingsModal?.dispatchEvent(new PointerEvent('pointermove',{bubbles:true,pointerId:7,clientX:(dragStart?.left??0)+128,clientY:(dragStart?.top??0)+54}));
+          settingsModal?.dispatchEvent(new PointerEvent('pointerup',{bubbles:true,pointerId:7,clientX:(dragStart?.left??0)+128,clientY:(dragStart?.top??0)+54}));
+          await wait(320);
+          const dragEnd=settingsModal?.getBoundingClientRect();
+          const settingsModalMoved=Boolean(dragStart&&dragEnd&&dragEnd.left>dragStart.left+30&&dragEnd.top>dragStart.top+20);
           const modalSizeBefore=settingsModal?.getBoundingClientRect();
           await setSelect(language,'en'); await wait(50);
+          const settingsCloseButtonLabel=document.querySelector('.settings-modal .modal-actions button')?.textContent==='Close';
           const englishNavPreview=document.querySelector('.settings-modal h2')?.textContent==='Settings'&&document.querySelector('[data-testid="settings-nav-defaults"]')?.textContent.includes('New connection defaults');
           document.querySelector('[data-testid="settings-nav-terminal"]')?.click(); await wait(40);
           const modalSizeAfterTerminal=document.querySelector('.settings-modal')?.getBoundingClientRect();
@@ -1622,7 +1671,7 @@ app.whenReady().then(() => {
           document.querySelector('[data-testid="new-connection"]').click();await wait(30);
           const englishConnectionUi=document.querySelector('.modal h2')?.textContent==='New SSH connection'&&document.querySelector('[data-testid="device-name"]')?.getAttribute('aria-label')==='Device name'&&document.querySelector('.auth-options legend')?.textContent==='Authentication method';
           window.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape'}));await wait(30);
-          return {settingsOpened,settingsSidebarVisible,settingsFixedSize,settingsContentScrollable,settingsModalResizable,settingsMinSizeLocked,settingsResizeAnchored,rememberedModalWidth:Math.round(modalSizeBefore?.width??0),rememberedModalHeight:Math.round(modalSizeBefore?.height??0),englishPreview,englishAppUi,englishConnectionUi,defaultLocalSessionOpened,appVersionVisible:appVersion?.textContent.includes('v${app.getVersion()}'),updateAvailableVisible:Boolean(updateResult),fontOptionCount:font?.options.length,defaultScrollback,defaultSplitShortcut,shortcutAdded,shortcutCaptured,shortcutReset,shortcutConflictWarning,shortcutConflictBlocked,shortcutRecaptured,fontColor,labelFontSize,sectionFontSize,settingsClosed:!document.querySelector('.settings-modal')};
+          return {settingsOpened,settingsSidebarVisible,settingsFixedSize,settingsContentScrollable,settingsModalResizable,settingsMinSizeLocked,settingsResizeAnchored,settingsOutsideClickKeptOpen,settingsModalMoved,settingsCloseButtonLabel,rememberedModalWidth:Math.round(modalSizeBefore?.width??0),rememberedModalHeight:Math.round(modalSizeBefore?.height??0),rememberedModalLeft:Math.round(modalSizeBefore?.left??0),rememberedModalTop:Math.round(modalSizeBefore?.top??0),englishPreview,englishAppUi,englishConnectionUi,defaultLocalSessionOpened,appVersionVisible:appVersion?.textContent.includes('v${app.getVersion()}'),updateAvailableVisible:Boolean(updateResult),fontOptionCount:font?.options.length,defaultScrollback,defaultSplitShortcut,shortcutAdded,shortcutCaptured,shortcutReset,shortcutConflictWarning,shortcutConflictBlocked,shortcutRecaptured,fontColor,labelFontSize,sectionFontSize,settingsClosed:!document.querySelector('.settings-modal')};
         })()`);
         const englishMenuLabels = Menu.getApplicationMenu()?.items.flatMap(
           (item) => [
@@ -1646,11 +1695,12 @@ app.whenReady().then(() => {
           const language=document.querySelector('[data-testid="language-select"]');
           const reopenedSize=document.querySelector('.settings-modal')?.getBoundingClientRect();
           const settingsModalSizeRestored=Boolean(reopenedSize&&Math.abs(reopenedSize.width-${settingsCheck.rememberedModalWidth})<2&&Math.abs(reopenedSize.height-${settingsCheck.rememberedModalHeight})<2);
+          const settingsModalPositionRestored=Boolean(reopenedSize&&Math.abs(reopenedSize.left-${settingsCheck.rememberedModalLeft})<2&&Math.abs(reopenedSize.top-${settingsCheck.rememberedModalTop})<2);
           const englishSettingsOpened=document.querySelector('.settings-modal h2')?.textContent==='Settings'&&language?.value==='en';
           const setter=Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value').set;setter.call(language,'ko');language.dispatchEvent(new Event('change',{bubbles:true}));await wait(40);
           const koreanPreview=document.querySelector('.settings-modal h2')?.textContent==='설정';
           document.querySelector('.settings-modal .modal-actions .primary').click();await wait(100);
-          return {englishSettingsOpened,settingsModalSizeRestored,reopenedWidth:Math.round(reopenedSize?.width??0),reopenedHeight:Math.round(reopenedSize?.height??0),koreanPreview,closed:!document.querySelector('.settings-modal')};
+          return {englishSettingsOpened,settingsModalSizeRestored,settingsModalPositionRestored,reopenedWidth:Math.round(reopenedSize?.width??0),reopenedHeight:Math.round(reopenedSize?.height??0),koreanPreview,closed:!document.querySelector('.settings-modal')};
         })()`);
         const koreanMenuLabels = Menu.getApplicationMenu()?.items.flatMap(
           (item) => [
@@ -1839,10 +1889,13 @@ app.whenReady().then(() => {
         result.koreanLanguageRestored =
           languageReset.englishSettingsOpened &&
           languageReset.settingsModalSizeRestored &&
+          languageReset.settingsModalPositionRestored &&
           languageReset.koreanPreview &&
           languageReset.closed;
         result.settingsModalSizeRestored =
           languageReset.settingsModalSizeRestored;
+        result.settingsModalPositionRestored =
+          languageReset.settingsModalPositionRestored;
         result.koreanMenu =
           koreanMenuLabels?.includes(appMenuName) &&
           koreanMenuLabels?.includes(`${appMenuName} 정보`) &&
@@ -1865,6 +1918,10 @@ app.whenReady().then(() => {
         result.settingsModalResizable = settingsCheck.settingsModalResizable;
         result.settingsMinSizeLocked = settingsCheck.settingsMinSizeLocked;
         result.settingsResizeAnchored = settingsCheck.settingsResizeAnchored;
+        result.settingsOutsideClickKeptOpen =
+          settingsCheck.settingsOutsideClickKeptOpen;
+        result.settingsModalMoved = settingsCheck.settingsModalMoved;
+        result.settingsCloseButtonLabel = settingsCheck.settingsCloseButtonLabel;
         const persistedSettings = loadSettings();
         result.settingsPersisted =
           persistedSettings.defaultUser === "global-test-user" &&
@@ -1874,7 +1931,11 @@ app.whenReady().then(() => {
           persistedSettings.settingsModalSize.width ===
             settingsCheck.rememberedModalWidth &&
           persistedSettings.settingsModalSize.height ===
-            settingsCheck.rememberedModalHeight;
+            settingsCheck.rememberedModalHeight &&
+          persistedSettings.settingsModalPosition.left ===
+            settingsCheck.rememberedModalLeft &&
+          persistedSettings.settingsModalPosition.top ===
+            settingsCheck.rememberedModalTop;
         result.defaultScrollback = settingsCheck.defaultScrollback;
         result.defaultSplitShortcut = settingsCheck.defaultSplitShortcut;
         result.shortcutAdded = settingsCheck.shortcutAdded;
@@ -2381,7 +2442,11 @@ app.whenReady().then(() => {
           result.settingsModalResizable &&
           result.settingsMinSizeLocked &&
           result.settingsResizeAnchored &&
+          result.settingsOutsideClickKeptOpen &&
+          result.settingsModalMoved &&
+          result.settingsCloseButtonLabel &&
           result.settingsModalSizeRestored &&
+          result.settingsModalPositionRestored &&
           result.settingsPersisted &&
           result.defaultScrollback &&
           result.defaultSplitShortcut &&

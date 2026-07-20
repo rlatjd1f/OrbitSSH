@@ -64,6 +64,10 @@ const defaultSettings: AppSettings = {
     width: 860,
     height: 640,
   },
+  settingsModalPosition: {
+    left: -1,
+    top: -1,
+  },
   shortcuts: {
     closeTab: ["CommandOrControl+W"],
     interrupt: ["Control+C"],
@@ -412,8 +416,10 @@ function SettingsForm({
   ] as const;
   return (
     <form onSubmit={onSubmit}>
-      <h2>{t("settings")}</h2>
-      <p>{t("settingsDescription")}</p>
+      <div className="settings-modal-header settings-drag-handle">
+        <h2>{t("settings")}</h2>
+        <p>{t("settingsDescription")}</p>
+      </div>
       <div className="settings-layout">
         <aside className="settings-nav" aria-label={t("settings")}>
           {sectionButtons.map(({ id, label, icon: Icon }) => (
@@ -821,7 +827,7 @@ function SettingsForm({
           )}
         </div>
       </div>
-      <div className="modal-actions"><button type="button" onClick={onCancel}>{t("cancel")}</button><button className="primary">{t("saveSettings")}</button></div>
+      <div className="modal-actions"><button type="button" onClick={onCancel}>{t("close")}</button><button className="primary">{t("saveSettings")}</button></div>
     </form>
   );
 }
@@ -997,6 +1003,11 @@ function App() {
   const settingsModalRef = useRef<HTMLDivElement | null>(null);
   const settingsModalResizeTimer = useRef<number | null>(null);
   const settingsRef = useRef(settings);
+  const settingsModalDragRef = useRef<{
+    pointerId: number;
+    offsetX: number;
+    offsetY: number;
+  } | null>(null);
   const [form, setForm] = useState({
     name: "",
     host: "0.0.0.0",
@@ -1018,24 +1029,56 @@ function App() {
     setSettings((current) => ({ ...current, settingsModalSize: size }));
     setSettingsDraft((draft) => ({ ...draft, settingsModalSize: size }));
   };
-  const persistSettingsModalSize = (size: AppSettings["settingsModalSize"]) => {
-    applySettingsModalSize(size);
-    void window.desktop?.settings.saveModalSize(size).then((savedSize) => {
-      applySettingsModalSize(savedSize);
+  const applySettingsModalPosition = (
+    position: AppSettings["settingsModalPosition"],
+  ) => {
+    settingsRef.current = {
+      ...settingsRef.current,
+      settingsModalPosition: position,
+    };
+    setSettings((current) => ({ ...current, settingsModalPosition: position }));
+    setSettingsDraft((draft) => ({
+      ...draft,
+      settingsModalPosition: position,
+    }));
+  };
+  const applySettingsModalPlacement = (placement: {
+    size?: AppSettings["settingsModalSize"];
+    position?: AppSettings["settingsModalPosition"];
+  }) => {
+    if (placement.size) applySettingsModalSize(placement.size);
+    if (placement.position) applySettingsModalPosition(placement.position);
+  };
+  const persistSettingsModalPlacement = (placement: {
+    size?: AppSettings["settingsModalSize"];
+    position?: AppSettings["settingsModalPosition"];
+  }) => {
+    applySettingsModalPlacement(placement);
+    void window.desktop?.settings.saveModalPlacement(placement).then((saved) => {
+      applySettingsModalPlacement({
+        size: saved.size,
+        position: saved.position,
+      });
     });
   };
-  const captureSettingsModalSize = () => {
+  const captureSettingsModalPlacement = () => {
     if (dialog !== "settings" || !settingsModalRef.current) return null;
     const rect = settingsModalRef.current.getBoundingClientRect();
     const width = Math.round(rect.width);
     const height = Math.round(rect.height);
     if (width <= 0 || height <= 0) return null;
-    const size = { width, height };
-    persistSettingsModalSize(size);
-    return size;
+    const placement = {
+      size: { width, height },
+      position: {
+        left: Math.round(rect.left),
+        top: Math.round(rect.top),
+      },
+    };
+    persistSettingsModalPlacement(placement);
+    return placement;
   };
   const closeDialog = () => {
-    captureSettingsModalSize();
+    captureSettingsModalPlacement();
     setDialog(null);
   };
   useEffect(() => {
@@ -1073,9 +1116,75 @@ function App() {
         window.clearTimeout(settingsModalResizeTimer.current);
         settingsModalResizeTimer.current = null;
       }
-      if (width > 0 && height > 0) persistSettingsModalSize({ width, height });
+      if (width > 0 && height > 0)
+        persistSettingsModalPlacement({ size: { width, height } });
     };
   }, [dialog]);
+  useEffect(() => {
+    if (dialog !== "settings" || !settingsModalRef.current) return;
+    settingsModalRef.current.focus();
+  }, [dialog]);
+  const clampSettingsModalPosition = (
+    left: number,
+    top: number,
+    width: number,
+    height: number,
+  ) => ({
+    left: Math.round(
+      Math.max(24, Math.min(left, window.innerWidth - width - 24)),
+    ),
+    top: Math.round(
+      Math.max(24, Math.min(top, window.innerHeight - height - 24)),
+    ),
+  });
+  const moveSettingsModal = (clientX: number, clientY: number) => {
+    const drag = settingsModalDragRef.current;
+    const modal = settingsModalRef.current;
+    if (!drag || !modal) return null;
+    const rect = modal.getBoundingClientRect();
+    const position = clampSettingsModalPosition(
+      clientX - drag.offsetX,
+      clientY - drag.offsetY,
+      rect.width,
+      rect.height,
+    );
+    applySettingsModalPosition(position);
+    return position;
+  };
+  const handleSettingsModalPointerDown = (event: React.PointerEvent) => {
+    if (dialog !== "settings" || event.button !== 0) return;
+    const target = event.target as HTMLElement;
+    if (!target.closest(".settings-drag-handle")) return;
+    const modal = settingsModalRef.current;
+    if (!modal) return;
+    const rect = modal.getBoundingClientRect();
+    settingsModalDragRef.current = {
+      pointerId: event.pointerId,
+      offsetX: event.clientX - rect.left,
+      offsetY: event.clientY - rect.top,
+    };
+    try {
+      modal.setPointerCapture(event.pointerId);
+    } catch {
+      // Synthetic pointer events in tests may not have an active browser pointer.
+    }
+    event.preventDefault();
+  };
+  const handleSettingsModalPointerMove = (event: React.PointerEvent) => {
+    if (settingsModalDragRef.current?.pointerId !== event.pointerId) return;
+    moveSettingsModal(event.clientX, event.clientY);
+  };
+  const handleSettingsModalPointerUp = (event: React.PointerEvent) => {
+    if (settingsModalDragRef.current?.pointerId !== event.pointerId) return;
+    const position = moveSettingsModal(event.clientX, event.clientY);
+    settingsModalDragRef.current = null;
+    try {
+      settingsModalRef.current?.releasePointerCapture(event.pointerId);
+    } catch {
+      // Ignore synthetic pointer release failures.
+    }
+    if (position) persistSettingsModalPlacement({ position });
+  };
   const stateLabel = (state: SessionState) =>
     t(
       ({
@@ -1233,9 +1342,15 @@ function App() {
     if (!dialog) return;
     const close = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
+        if (
+          dialog === "settings" &&
+          settingsModalRef.current &&
+          !settingsModalRef.current.contains(document.activeElement)
+        )
+          return;
         event.preventDefault();
         event.stopPropagation();
-        setDialog(null);
+        closeDialog();
       }
     };
     window.addEventListener("keydown", close, true);
@@ -1391,10 +1506,14 @@ function App() {
   };
   const submitSettings = async (e: FormEvent) => {
     e.preventDefault();
-    const settingsModalSize = captureSettingsModalSize();
+    const settingsModalPlacement = captureSettingsModalPlacement();
     const saved = await window.desktop!.settings.save(
-      settingsModalSize
-        ? { ...settingsDraft, settingsModalSize }
+      settingsModalPlacement
+        ? {
+            ...settingsDraft,
+            settingsModalSize: settingsModalPlacement.size,
+            settingsModalPosition: settingsModalPlacement.position,
+          }
         : settingsDraft,
     );
     setSettings(saved);
@@ -2227,11 +2346,13 @@ function App() {
         <div
           className="modal-backdrop"
           onMouseDown={(e) => {
-            if (e.target === e.currentTarget) closeDialog();
+            if (dialog !== "settings" && e.target === e.currentTarget)
+              closeDialog();
           }}
         >
           <div
             ref={dialog === "settings" ? settingsModalRef : undefined}
+            tabIndex={dialog === "settings" ? -1 : undefined}
             className={`modal ${dialog === "settings" ? "settings-modal" : ""} ${
               dialog === "update-check" ? "update-check-modal" : ""
             }`}
@@ -2240,9 +2361,20 @@ function App() {
                 ? {
                     width: settingsDraft.settingsModalSize.width,
                     height: settingsDraft.settingsModalSize.height,
+                    ...(settingsDraft.settingsModalPosition.left >= 0 &&
+                    settingsDraft.settingsModalPosition.top >= 0
+                      ? {
+                          left: settingsDraft.settingsModalPosition.left,
+                          top: settingsDraft.settingsModalPosition.top,
+                        }
+                      : {}),
                   }
                 : undefined
             }
+            onPointerDown={handleSettingsModalPointerDown}
+            onPointerMove={handleSettingsModalPointerMove}
+            onPointerUp={handleSettingsModalPointerUp}
+            onPointerCancel={handleSettingsModalPointerUp}
           >
             <button
               className="modal-close"
