@@ -1530,9 +1530,19 @@ app.whenReady().then(() => {
           const setValue=async(el,value)=>{const setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;setter.call(el,value);el.dispatchEvent(new Event('input',{bubbles:true}));await wait(30)};
           const setSelect=async(el,value)=>{const setter=Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value').set;setter.call(el,value);el.dispatchEvent(new Event('change',{bubbles:true}));await wait(30)};
           const settingsOpened=Boolean(settingsSidebarVisible&&language);
-          const modalSizeBefore=document.querySelector('.settings-modal')?.getBoundingClientRect();
-          const modalStyle=getComputedStyle(document.querySelector('.settings-modal'));
+          const settingsModal=document.querySelector('.settings-modal');
+          const initialModalSize=settingsModal?.getBoundingClientRect();
+          const modalStyle=getComputedStyle(settingsModal);
           const settingsModalResizable=modalStyle.resize==='both'&&modalStyle.overflow==='hidden';
+          if(settingsModal){settingsModal.style.width='200px';settingsModal.style.height='200px';}
+          await wait(30);
+          const modalSizeAfterShrinkAttempt=settingsModal?.getBoundingClientRect();
+          const settingsMinSizeLocked=Boolean(initialModalSize&&modalSizeAfterShrinkAttempt&&modalSizeAfterShrinkAttempt.width>=initialModalSize.width-1&&modalSizeAfterShrinkAttempt.height>=initialModalSize.height-1);
+          if(settingsModal&&initialModalSize){settingsModal.style.width=(initialModalSize.width+48)+'px';settingsModal.style.height=(initialModalSize.height+36)+'px';}
+          await wait(30);
+          const modalSizeAfterGrow=settingsModal?.getBoundingClientRect();
+          const settingsResizeAnchored=Boolean(initialModalSize&&modalSizeAfterGrow&&Math.abs(initialModalSize.left-modalSizeAfterGrow.left)<1&&Math.abs(initialModalSize.top-modalSizeAfterGrow.top)<1&&modalSizeAfterGrow.width>initialModalSize.width&&modalSizeAfterGrow.height>initialModalSize.height);
+          const modalSizeBefore=settingsModal?.getBoundingClientRect();
           await setSelect(language,'en'); await wait(50);
           const englishNavPreview=document.querySelector('.settings-modal h2')?.textContent==='Settings'&&document.querySelector('[data-testid="settings-nav-defaults"]')?.textContent.includes('New connection defaults');
           document.querySelector('[data-testid="settings-nav-terminal"]')?.click(); await wait(40);
@@ -1584,7 +1594,7 @@ app.whenReady().then(() => {
           document.querySelector('[data-testid="new-connection"]').click();await wait(30);
           const englishConnectionUi=document.querySelector('.modal h2')?.textContent==='New SSH connection'&&document.querySelector('[data-testid="device-name"]')?.getAttribute('aria-label')==='Device name'&&document.querySelector('.auth-options legend')?.textContent==='Authentication method';
           window.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape'}));await wait(30);
-          return {settingsOpened,settingsSidebarVisible,settingsFixedSize,settingsContentScrollable,settingsModalResizable,englishPreview,englishAppUi,englishConnectionUi,defaultLocalSessionOpened,appVersionVisible:appVersion?.textContent.includes('v${app.getVersion()}'),updateAvailableVisible:Boolean(updateResult),fontOptionCount:font?.options.length,defaultScrollback,defaultSplitShortcut,shortcutAdded,shortcutCaptured,shortcutReset,shortcutConflictWarning,shortcutConflictBlocked,shortcutRecaptured,fontColor,labelFontSize,sectionFontSize,settingsClosed:!document.querySelector('.settings-modal')};
+          return {settingsOpened,settingsSidebarVisible,settingsFixedSize,settingsContentScrollable,settingsModalResizable,settingsMinSizeLocked,settingsResizeAnchored,englishPreview,englishAppUi,englishConnectionUi,defaultLocalSessionOpened,appVersionVisible:appVersion?.textContent.includes('v${app.getVersion()}'),updateAvailableVisible:Boolean(updateResult),fontOptionCount:font?.options.length,defaultScrollback,defaultSplitShortcut,shortcutAdded,shortcutCaptured,shortcutReset,shortcutConflictWarning,shortcutConflictBlocked,shortcutRecaptured,fontColor,labelFontSize,sectionFontSize,settingsClosed:!document.querySelector('.settings-modal')};
         })()`);
         const englishMenuLabels = Menu.getApplicationMenu()?.items.flatMap(
           (item) => [
@@ -1820,6 +1830,8 @@ app.whenReady().then(() => {
         result.settingsFixedSize = settingsCheck.settingsFixedSize;
         result.settingsContentScrollable = settingsCheck.settingsContentScrollable;
         result.settingsModalResizable = settingsCheck.settingsModalResizable;
+        result.settingsMinSizeLocked = settingsCheck.settingsMinSizeLocked;
+        result.settingsResizeAnchored = settingsCheck.settingsResizeAnchored;
         const persistedSettings = loadSettings();
         result.settingsPersisted =
           persistedSettings.defaultUser === "global-test-user" &&
@@ -2330,6 +2342,8 @@ app.whenReady().then(() => {
           result.settingsFixedSize &&
           result.settingsContentScrollable &&
           result.settingsModalResizable &&
+          result.settingsMinSizeLocked &&
+          result.settingsResizeAnchored &&
           result.settingsPersisted &&
           result.defaultScrollback &&
           result.defaultSplitShortcut &&

@@ -717,10 +717,15 @@
   box-shadow: 0 0 8px rgba(85, 212, 173, 0.55);
 }
 .settings-modal {
-  width: min(860px, calc(100vw - 48px));
-  height: min(640px, calc(100vh - 48px));
-  min-width: min(620px, calc(100vw - 48px));
-  min-height: min(460px, calc(100vh - 48px));
+  --settings-modal-width: min(860px, calc(100vw - 48px));
+  --settings-modal-height: min(640px, calc(100vh - 48px));
+  position: absolute;
+  left: max(24px, calc((100vw - 860px) / 2));
+  top: max(24px, calc((100vh - 640px) / 2));
+  width: var(--settings-modal-width);
+  height: var(--settings-modal-height);
+  min-width: var(--settings-modal-width);
+  min-height: var(--settings-modal-height);
   max-width: calc(100vw - 48px);
   max-height: calc(100vh - 48px);
   resize: both;
